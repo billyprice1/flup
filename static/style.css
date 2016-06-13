@@ -1,0 +1,72 @@
+body {
+	text-align: center;
+	background: #222;
+	color: #CCC;
+	width: 400px;
+	margin: auto;
+	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+*::-moz-selection {
+	color: #CCC;
+	background: #595;
+}
+
+*::selection {
+	color: #CCC;
+	background: #595;
+}
+
+footer {
+	height: 20px;
+}
+
+a, a:visited {
+	color: #595;
+}
+
+input[type="text"] {
+	border: none;
+	border-radius: 2px;
+}
+
+.box {
+	background: #444;
+	margin: 20px 0;
+	border-radius: 3px;
+	padding: 10px;
+}
+
+.break {
+	word-wrap: break-word;
+}
+
+#header {
+	font-size: 60px;
+	line-height: 1;
+	margin: 20px 0 40px;
+}
+
+#anime {
+	height: 300px;
+	position: fixed;
+	bottom: 0px;
+	right: 0px;
+	z-index: -1;
+}
+
+#anime:hover {
+	filter: brightness(1.2);
+}
+
+#upload {
+	background: #595;
+	color: #EEE;
+	width: 150px;
+	height: 50px;
+	display: inline-block;
+	border-radius: 3px;
+	line-height: 3;
+	border: none;
+	margin: 10px;
+}

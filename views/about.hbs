@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>Lainfile</title>
+  <meta name=viewport content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+  <div id="wrapper">
+    <h1>About</h1>
+
+    <p class="box">Lainfile is a simple file uploading website, written from scratch in Rust using Iron and Redis. It's running on a really shit server, and I doubt it can handle much traffic, but feel free to use it for whatever.</p>
+
+    <p class="box">Lainfile remembers filenames, for example if you upload maymay.jpg and get the URL "/M3ME", then downloading it will give you maymay.jpg again. In the case you have an extended URL (such as /M3ME/maymay.jpg), just trim the end off, it's not needed.</p>
+
+    <p class="box">The source code is currently private, I'll probably open-source it in a week or so, it just requires some cleaning up.</p>
+
+    <img src="/static/anime.png" id="anime">
+  </div>
+</body>
+</html>

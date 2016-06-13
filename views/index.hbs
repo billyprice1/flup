@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+	<title>Lainfile</title>
+	<meta name=viewport content="width=device-width, initial-scale=1">
+
+	<link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+	<h1 id="header">ｗｉｒｅｄ</h1>
+
+	<form action="/" method="post" enctype="multipart/form-data">
+		<div class="box">
+			<label for="desc-input">Description (optional):</label>
+			<br>
+			<input type="text" name="desc" id="desc-input">
+
+			<br>
+			<br>
+
+			<label for="public-toggle">Show on public list:</label>
+			<input type="checkbox" name="public" id="public-toggle">
+		</div>
+
+		<div class="box">
+			<input type="file" name="file" id="file-select">
+		</div>
+
+		<input type="submit" value="Upload!" id="upload">
+	</form>
+
+	<h5><a href="/about">about page</a></h5>
+
+	<img src="/static/anime.png" id="anime">
+
+	<footer>There are currently {{ uploads_count }} uploads, and {{ public_uploads_count }} <a href="uploads">public uploads</a>!</footer>
+
+	<script src="/static/script.js"></script>
+</body>
+</html>
