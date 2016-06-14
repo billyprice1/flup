@@ -122,6 +122,11 @@ pub enum UploadError {
     AddFile,
 }
 
+#[derive(Debug)]
+pub enum GetError {
+    NotFound,
+}
+
 impl Flup {
     pub fn new(config: FlupConfig) -> Result<Flup, StartError> {
         let db = try!(FlupDb::new());
@@ -237,6 +242,18 @@ impl Flup {
             (file_id, file_info)
         })
     }
+
+    pub fn file_by_id(&self, req: &mut Request) -> Result<(String, FileInfo), GetError> {
+        let router = req.extensions.get::<Router>().unwrap();
+
+        let file_id = router.find("id").unwrap().to_string();
+
+        guard!(let Ok(file_info) = self.db.get_file(file_id.clone()) else {
+            return Err(GetError::NotFound);
+        });
+
+        Ok((file_id, file_info))
+    }
 }
 
 impl FlupHandler {
@@ -299,21 +316,22 @@ impl FlupHandler {
         }
     }
 
-    // pub fn handle_file_by_id(&self, req: &mut Request) -> IronResult<Response> {
-    //     let router = req.extensions.get::<Router>().unwrap();
-    //
-    //     guard!(let Some(file_id) = router.find("id") else {
-    //         return self.error_page(Status::BadRequest, "File not specified");
-    //     });
-    //
-    //     guard!(let Ok(file_info) = self.db.get_file(file_id.to_string()) else {
-    //         return self.error_page(Status::NotFound, "File not found");
-    //     });
-    //
-    //     let url = format!("{}/{}/{}", self.config.url, file_id.to_string(), file_info.name);
-    //     Ok(Response::with((Status::SeeOther, Redirect(Url::parse(url.as_str()).unwrap()))))
-    // }
-    //
+    pub fn handle_file_by_id(&self, req: &mut Request) -> IronResult<Response> {
+        match self.flup.file_by_id(req) {
+            Ok((file_id, file_info)) => {
+                let url = format!("{}/{}/{}", self.flup.config.url, file_id, file_info.name);
+                Ok(Response::with((Status::SeeOther, Redirect(Url::parse(url.as_str()).unwrap()))))
+            },
+            Err(error) => {
+                match error {
+                    GetError::NotFound => {
+                        self.error_page(Status::NotFound, "File not found")
+                    }
+                }
+            },
+        }
+    }
+
     // pub fn handle_file(&self, req: &mut Request) -> IronResult<Response> {
     //     let router = req.extensions.get::<Router>().unwrap();
     //
