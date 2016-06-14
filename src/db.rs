@@ -2,7 +2,7 @@ extern crate r2d2;
 extern crate r2d2_redis;
 extern crate redis;
 
-use super::{FlupError, FlupFile};
+use super::{StartError, FileInfo};
 
 use rustc_serialize::json;
 
@@ -18,22 +18,22 @@ pub struct FlupDb {
     redis: r2d2::Pool<RedisConnectionManager>,
 }
 
-impl ToRedisArgs for FlupFile {
+impl ToRedisArgs for FileInfo {
     fn to_redis_args(&self) -> Vec<Vec<u8>> {
         json::encode(self).unwrap().to_redis_args()
     }
 }
 
-impl FromRedisValue for FlupFile {
+impl FromRedisValue for FileInfo {
     fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
         Ok(json::decode(try!(String::from_redis_value(v)).as_str()).unwrap())
     }
 }
 
 impl FlupDb {
-    pub fn new() -> Result<FlupDb, FlupError> {
+    pub fn new() -> Result<FlupDb, StartError> {
         let manager = match RedisConnectionManager::new("redis://127.0.0.1/") {
-            Err(error) => return Err(FlupError::Redis(error)),
+            Err(error) => return Err(StartError::Redis(error)),
             Ok(manager) => manager,
         };
 
@@ -46,7 +46,7 @@ impl FlupDb {
         })
     }
 
-    pub fn add_file(&self, file_id: String, file: FlupFile, public: bool) -> redis::RedisResult<()> {
+    pub fn add_file(&self, file_id: String, file: FileInfo, public: bool) -> redis::RedisResult<()> {
         let redis = self.redis.get().unwrap();
 
         try!(redis.hset("flup::files", file_id.clone(), file));
@@ -58,7 +58,7 @@ impl FlupDb {
         Ok(())
     }
 
-    pub fn get_file(&self, file_id: String) -> redis::RedisResult<FlupFile> {
+    pub fn get_file(&self, file_id: String) -> redis::RedisResult<FileInfo> {
         let redis = self.redis.get().unwrap();
 
         match redis.hget("flup::files", file_id) {
@@ -84,7 +84,7 @@ impl FlupDb {
         }
     }
 
-    pub fn get_uploads(&self) -> redis::RedisResult<Vec<FlupFile>> {
+    pub fn get_uploads(&self) -> redis::RedisResult<Vec<FileInfo>> {
         let redis = self.redis.get().unwrap();
 
         let public_ids: Vec<String> = try!(redis.lrange("flup::publicfiles", 0, 20));
