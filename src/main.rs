@@ -242,11 +242,7 @@ impl Flup {
         Ok(file_id)
     }
 
-    pub fn file_by_id(&self, req: &mut Request) -> Result<(String, FileInfo), GetError> {
-        let router = req.extensions.get::<Router>().unwrap();
-
-        let file_id = router.find("id").unwrap().to_string();
-
+    pub fn file_by_id(&self, file_id: String) -> Result<(String, FileInfo), GetError> {
         guard!(let Ok(file_info) = self.db.get_file(file_id.clone()) else {
             return Err(GetError::NotFound);
         });
@@ -328,7 +324,10 @@ impl FlupHandler {
     }
 
     pub fn handle_file_by_id(&self, req: &mut Request) -> IronResult<Response> {
-        match self.flup.file_by_id(req) {
+        let router = req.extensions.get::<Router>().unwrap();
+        let file_id = router.find("id").unwrap().to_string();
+
+        match self.flup.file_by_id(file_id) {
             Ok((file_id, file_info)) => {
                 let url = format!("{}/{}/{}", self.flup.config.url, file_id, file_info.name);
                 Ok(Response::with((Status::SeeOther, Redirect(Url::parse(url.as_str()).unwrap()))))
