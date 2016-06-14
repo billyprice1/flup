@@ -60,6 +60,8 @@ struct FlupConfig {
     host: String,
     url: String,
     salt: String,
+    xforwarded: bool,
+    xforwarded_index: usize,
 }
 
 #[derive(Clone)]
@@ -123,13 +125,13 @@ impl FlupHandler {
 
     pub fn handle_upload(&self, req: &mut Request) -> IronResult<Response> {
         let ip = match req.headers.get_raw("X-Forwarded-For") {
-            Some(data) if data.len() == 1 => {
-                let ips = String::from_utf8(data[0].clone()).unwrap();
+            Some(data) if data.len() == 1 && self.config.xforwarded == true => {
+                let ips_string = String::from_utf8(data[0].clone()).unwrap();
+                let mut ips: Vec<&str> = ips_string.split(", ").collect();
 
-                match ips.find(", ") {
-                    Some(i) => ips[..i].to_string(),
-                    None => ips,
-                }
+                ips.reverse();
+
+                ips.get(self.config.xforwarded_index).unwrap().to_string()
             },
             _ => req.remote_addr.to_string(),
         };
