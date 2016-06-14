@@ -108,6 +108,14 @@ pub enum StartError {
     Io(io::Error),
 }
 
+pub struct IdGetRequest {
+    file_id: String,
+}
+
+pub struct GetRequest {
+    file_id: String,
+}
+
 #[derive(Debug)]
 pub enum UploadError {
     SetIp,
@@ -126,6 +134,11 @@ pub enum UploadError {
 pub enum GetError {
     NotFound,
     FileNotFound
+}
+
+#[derive(Debug)]
+pub enum IdGetError {
+    NotFound,
 }
 
 impl Flup {
@@ -242,20 +255,20 @@ impl Flup {
         Ok(file_id)
     }
 
-    pub fn file_by_id(&self, file_id: String) -> Result<(String, FileInfo), GetError> {
-        guard!(let Ok(file_info) = self.db.get_file(file_id.clone()) else {
-            return Err(GetError::NotFound);
+    pub fn file_by_id(&self, req: IdGetRequest) -> Result<(String, FileInfo), IdGetError> {
+        guard!(let Ok(file_info) = self.db.get_file(req.file_id.clone()) else {
+            return Err(IdGetError::NotFound);
         });
 
-        Ok((file_id, file_info))
+        Ok((req.file_id, file_info))
     }
 
-    pub fn file(&self, file_id: String) -> Result<(FileInfo, Vec<u8>), GetError> {
-        guard!(let Ok(file_info) = self.db.get_file(file_id.to_string()) else {
+    pub fn file(&self, req: GetRequest) -> Result<(FileInfo, Vec<u8>), GetError> {
+        guard!(let Ok(file_info) = self.db.get_file(req.file_id.clone()) else {
             return Err(GetError::NotFound);
         });
 
-        guard!(let Ok(file_data) = self.fs.get_file(file_id.to_string()) else {
+        guard!(let Ok(file_data) = self.fs.get_file(req.file_id.clone()) else {
             return Err(GetError::FileNotFound);
         });
 
@@ -327,17 +340,20 @@ impl FlupHandler {
         let router = req.extensions.get::<Router>().unwrap();
         let file_id = router.find("id").unwrap().to_string();
 
-        match self.flup.file_by_id(file_id) {
+        let flup_req = IdGetRequest {
+            file_id: file_id,
+        };
+
+        match self.flup.file_by_id(flup_req) {
             Ok((file_id, file_info)) => {
                 let url = format!("{}/{}/{}", self.flup.config.url, file_id, file_info.name);
                 Ok(Response::with((Status::SeeOther, Redirect(Url::parse(url.as_str()).unwrap()))))
             },
             Err(error) => {
                 match error {
-                    GetError::NotFound => {
+                    IdGetError::NotFound => {
                         self.error_page(Status::NotFound, "File not found")
                     }
-                    _ => unreachable!()
                 }
             },
         }
@@ -347,7 +363,11 @@ impl FlupHandler {
         let router = req.extensions.get::<Router>().unwrap();
         let file_id = router.find("id").unwrap().to_string();
 
-        match self.flup.file(file_id) {
+        let flup_req = GetRequest {
+            file_id: file_id,
+        };
+
+        match self.flup.file(flup_req) {
             Ok((file_info, file_data)) => {
                 let mime = mime_guess::guess_mime_type(Path::new(file_info.name.as_str()));
                 Ok(Response::with((Status::Ok, mime, file_data)))
