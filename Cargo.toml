@@ -1,0 +1,21 @@
+[package]
+name = "flup"
+version = "0.1.0"
+authors = ["installgen2 <gen2@kek.club>"]
+
+[dependencies]
+iron = "*"
+params = "*"
+router = "*"
+guard = "*"
+handlebars-iron = "*"
+rustc-serialize = "*"
+tojson_macros = "*"
+staticfile = "*"
+mount = "*"
+mime_guess = "*"
+redis = "*"
+toml = "*"
+rust-crypto = "*"
+r2d2 = "*"
+r2d2_redis = "*"
