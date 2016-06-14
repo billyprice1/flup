@@ -124,7 +124,9 @@ pub enum UploadError {
 
 #[derive(Debug)]
 pub enum GetError {
+    FileNotSpecified,
     NotFound,
+    FileNotFound
 }
 
 impl Flup {
@@ -254,6 +256,24 @@ impl Flup {
 
         Ok((file_id, file_info))
     }
+
+    pub fn file(&self, req: &mut Request) -> Result<(FileInfo, Vec<u8>), GetError> {
+        let router = req.extensions.get::<Router>().unwrap();
+
+        guard!(let Some(file_id) = router.find("id") else {
+            return Err(GetError::FileNotSpecified);
+        });
+
+        guard!(let Ok(file_info) = self.db.get_file(file_id.to_string()) else {
+            return Err(GetError::NotFound);
+        });
+
+        guard!(let Ok(file_data) = self.fs.get_file(file_id.to_string()) else {
+            return Err(GetError::FileNotFound);
+        });
+
+        Ok((file_info, file_data))
+    }
 }
 
 impl FlupHandler {
@@ -327,31 +347,24 @@ impl FlupHandler {
                     GetError::NotFound => {
                         self.error_page(Status::NotFound, "File not found")
                     }
+                    _ => unreachable!()
                 }
             },
         }
     }
 
-    // pub fn handle_file(&self, req: &mut Request) -> IronResult<Response> {
-    //     let router = req.extensions.get::<Router>().unwrap();
-    //
-    //     guard!(let Some(file_id) = router.find("id") else {
-    //         return self.error_page(Status::BadRequest, "File not specified");
-    //     });
-    //
-    //     guard!(let Ok(file_info) = self.db.get_file(file_id.to_string()) else {
-    //         return self.error_page(Status::NotFound, "File not found");
-    //     });
-    //
-    //     guard!(let Ok(file_data) = self.fs.get_file(file_id.to_string()) else {
-    //         return self.error_page(Status::InternalServerError, "Not found on disk?!")
-    //     });
-    //
-    //     let mime = mime_guess::guess_mime_type(Path::new(file_info.name.as_str()));
-    //
-    //     Ok(Response::with((Status::Ok, mime, file_data)))
-    // }
-    //
+    pub fn handle_file(&self, req: &mut Request) -> IronResult<Response> {
+        match self.flup.file(req) {
+            Ok((file_info, file_data)) => {
+                let mime = mime_guess::guess_mime_type(Path::new(file_info.name.as_str()));
+                Ok(Response::with((Status::Ok, mime, file_data)))
+            },
+            Err(error) => {
+                panic!();
+            },
+        }
+    }
+
     // pub fn handle_home(&self, _: &mut Request) -> IronResult<Response> {
     //     let uploads_count = self.db.get_uploads_count().unwrap_or(0);
     //     let public_uploads_count = self.db.get_public_uploads_count().unwrap_or(0);
