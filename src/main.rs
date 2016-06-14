@@ -93,8 +93,8 @@ struct ErrorPageData {
 #[derive(Clone)]
 struct Flup {
     pub config: FlupConfig,
-    db: FlupDb,
-    fs: FlupFs,
+    pub db: FlupDb,
+    pub fs: FlupFs,
 }
 
 #[derive(Clone)]
@@ -124,7 +124,6 @@ pub enum UploadError {
 
 #[derive(Debug)]
 pub enum GetError {
-    FileNotSpecified,
     NotFound,
     FileNotFound
 }
@@ -141,7 +140,7 @@ impl Flup {
         })
     }
 
-    pub fn upload(&self, req: &mut Request) -> Result<(String, FileInfo), UploadError> {
+    pub fn upload(&self, req: &mut Request) -> Result<String, UploadError> {
         let ip = match req.headers.get_raw("X-Forwarded-For") {
             Some(data) if data.len() == 1 && self.config.xforwarded == true => {
                 let ips_string = String::from_utf8(data[0].clone()).unwrap();
@@ -187,9 +186,7 @@ impl Flup {
 
         let file_id = hash_file(&file_data);
 
-        Ok(if let Ok(file_info) = self.db.get_file(file_id.to_string()) {
-            (file_id, file_info)
-        } else {
+        if let Err(_) = self.db.get_file(file_id.to_string()) {
             if let Err(_) = self.fs.write_file(file_id.clone(), file_data) {
                 return Err(UploadError::WriteFile);
             }
@@ -237,12 +234,12 @@ impl Flup {
                 uploader: uploader,
             };
 
-            if let Err(error) = self.db.add_file(file_id.clone(), file_info.clone(), is_public) {
+            if let Err(_) = self.db.add_file(file_id.clone(), file_info.clone(), is_public) {
                 return Err(UploadError::AddFile);
             }
+        }
 
-            (file_id, file_info)
-        })
+        Ok(file_id)
     }
 
     pub fn file_by_id(&self, req: &mut Request) -> Result<(String, FileInfo), GetError> {
@@ -260,9 +257,7 @@ impl Flup {
     pub fn file(&self, req: &mut Request) -> Result<(FileInfo, Vec<u8>), GetError> {
         let router = req.extensions.get::<Router>().unwrap();
 
-        guard!(let Some(file_id) = router.find("id") else {
-            return Err(GetError::FileNotSpecified);
-        });
+        let file_id = router.find("id").unwrap();
 
         guard!(let Ok(file_info) = self.db.get_file(file_id.to_string()) else {
             return Err(GetError::NotFound);
@@ -295,7 +290,7 @@ impl FlupHandler {
 
     pub fn handle_upload(&self, req: &mut Request) -> IronResult<Response> {
         match self.flup.upload(req) {
-            Ok((file_id, file_info)) => {
+            Ok(file_id) => {
                 let url = format!("{}/{}", self.flup.config.url, file_id);
                 Ok(Response::with((Status::Ok, format!("{}", url))))
             },
@@ -360,42 +355,49 @@ impl FlupHandler {
                 Ok(Response::with((Status::Ok, mime, file_data)))
             },
             Err(error) => {
-                panic!();
+                match error {
+                    GetError::NotFound => {
+                        self.error_page(Status::NotFound, "File not found")
+                    },
+                    GetError::FileNotFound => {
+                        self.error_page(Status::NotFound, "File not found (on disk (oh fuck))")
+                    },
+                }
             },
         }
     }
 
-    // pub fn handle_home(&self, _: &mut Request) -> IronResult<Response> {
-    //     let uploads_count = self.db.get_uploads_count().unwrap_or(0);
-    //     let public_uploads_count = self.db.get_public_uploads_count().unwrap_or(0);
-    //
-    //     let data = HomePageData {
-    //         uploads_count: uploads_count,
-    //         public_uploads_count: public_uploads_count,
-    //     };
-    //
-    //     let mut resp = Response::new();
-    //     resp.set_mut(Template::new("index", data)).set_mut(Status::Ok);
-    //     Ok(resp)
-    // }
-    //
-    // pub fn handle_uploads(&self, _: &mut Request) -> IronResult<Response> {
-    //     let uploads = self.db.get_uploads().unwrap_or(vec![]);
-    //
-    //     let data = UploadsPageData {
-    //         uploads: uploads,
-    //     };
-    //
-    //     let mut resp = Response::new();
-    //     resp.set_mut(Template::new("uploads", data)).set_mut(Status::Ok);
-    //     Ok(resp)
-    // }
-    //
-    // pub fn handle_about(&self, _: &mut Request) -> IronResult<Response> {
-    //     let mut resp = Response::new();
-    //     resp.set_mut(Template::new("about", ())).set_mut(Status::Ok);
-    //     Ok(resp)
-    // }
+    pub fn handle_home(&self, _: &mut Request) -> IronResult<Response> {
+        let uploads_count = self.flup.db.get_uploads_count().unwrap_or(0);
+        let public_uploads_count = self.flup.db.get_public_uploads_count().unwrap_or(0);
+
+        let data = HomePageData {
+            uploads_count: uploads_count,
+            public_uploads_count: public_uploads_count,
+        };
+
+        let mut resp = Response::new();
+        resp.set_mut(Template::new("index", data)).set_mut(Status::Ok);
+        Ok(resp)
+    }
+
+    pub fn handle_uploads(&self, _: &mut Request) -> IronResult<Response> {
+        let uploads = self.flup.db.get_uploads().unwrap_or(vec![]);
+
+        let data = UploadsPageData {
+            uploads: uploads,
+        };
+
+        let mut resp = Response::new();
+        resp.set_mut(Template::new("uploads", data)).set_mut(Status::Ok);
+        Ok(resp)
+    }
+
+    pub fn handle_about(&self, _: &mut Request) -> IronResult<Response> {
+        let mut resp = Response::new();
+        resp.set_mut(Template::new("about", ())).set_mut(Status::Ok);
+        Ok(resp)
+    }
 }
 
 fn get_config() -> FlupConfig {
@@ -418,40 +420,40 @@ fn new_flup_router(flup_handler: FlupHandler) -> Router {
         });
     }
 
-    // {
-    //     let flup_handler = flup_handler.clone();
-    //     router.get("/:id", move |req: &mut Request| {
-    //         flup_handler.handle_file_by_id(req)
-    //     });
-    // }
-    //
-    // {
-    //     let flup_handler = flup_handler.clone();
-    //     router.get("/:id/*", move |req: &mut Request| {
-    //         flup_handler.handle_file(req)
-    //     });
-    // }
-    //
-    // {
-    //     let flup_handler = flup_handler.clone();
-    //     router.get("/uploads", move |req: &mut Request| {
-    //         flup_handler.handle_uploads(req)
-    //     });
-    // }
-    //
-    // {
-    //     let flup_handler = flup_handler.clone();
-    //     router.get("/about", move |req: &mut Request| {
-    //         flup_handler.handle_about(req)
-    //     });
-    // }
-    //
-    // {
-    //     let flup_handler = flup_handler.clone();
-    //     router.get("/", move |req: &mut Request| {
-    //         flup_handler.handle_home(req)
-    //     });
-    // }
+    {
+        let flup_handler = flup_handler.clone();
+        router.get("/:id", move |req: &mut Request| {
+            flup_handler.handle_file_by_id(req)
+        });
+    }
+
+    {
+        let flup_handler = flup_handler.clone();
+        router.get("/:id/*", move |req: &mut Request| {
+            flup_handler.handle_file(req)
+        });
+    }
+
+    {
+        let flup_handler = flup_handler.clone();
+        router.get("/uploads", move |req: &mut Request| {
+            flup_handler.handle_uploads(req)
+        });
+    }
+
+    {
+        let flup_handler = flup_handler.clone();
+        router.get("/about", move |req: &mut Request| {
+            flup_handler.handle_about(req)
+        });
+    }
+
+    {
+        let flup_handler = flup_handler.clone();
+        router.get("/", move |req: &mut Request| {
+            flup_handler.handle_home(req)
+        });
+    }
 
     router
 }
