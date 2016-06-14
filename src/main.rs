@@ -254,11 +254,7 @@ impl Flup {
         Ok((file_id, file_info))
     }
 
-    pub fn file(&self, req: &mut Request) -> Result<(FileInfo, Vec<u8>), GetError> {
-        let router = req.extensions.get::<Router>().unwrap();
-
-        let file_id = router.find("id").unwrap();
-
+    pub fn file(&self, file_id: String) -> Result<(FileInfo, Vec<u8>), GetError> {
         guard!(let Ok(file_info) = self.db.get_file(file_id.to_string()) else {
             return Err(GetError::NotFound);
         });
@@ -349,7 +345,10 @@ impl FlupHandler {
     }
 
     pub fn handle_file(&self, req: &mut Request) -> IronResult<Response> {
-        match self.flup.file(req) {
+        let router = req.extensions.get::<Router>().unwrap();
+        let file_id = router.find("id").unwrap().to_string();
+
+        match self.flup.file(file_id) {
             Ok((file_info, file_data)) => {
                 let mime = mime_guess::guess_mime_type(Path::new(file_info.name.as_str()));
                 Ok(Response::with((Status::Ok, mime, file_data)))
