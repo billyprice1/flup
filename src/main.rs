@@ -108,6 +108,21 @@ pub enum StartError {
     Io(io::Error),
 }
 
+pub struct UploadRequestPost {
+    file: Option<params::File>,
+
+    public: bool,
+    desc: Option<String>,
+}
+
+pub struct UploadRequest {
+    xforwarded: Option<String>,
+
+    post: Option<UploadRequestPost>,
+
+    ip: String,
+}
+
 pub struct IdGetRequest {
     file_id: String,
 }
@@ -153,17 +168,19 @@ impl Flup {
         })
     }
 
-    pub fn upload(&self, req: &mut Request) -> Result<String, UploadError> {
-        let ip = match req.headers.get_raw("X-Forwarded-For") {
-            Some(data) if data.len() == 1 && self.config.xforwarded == true => {
-                let ips_string = String::from_utf8(data[0].clone()).unwrap();
-                let mut ips: Vec<&str> = ips_string.split(", ").collect();
+    pub fn upload(&self, req: UploadRequest) -> Result<String, UploadError> {
+        guard!(let Some(post) = req.post else {
+            return Err(UploadError::NoPostParams);
+        });
 
+        let ip = match req.xforwarded {
+            Some(ref ips_string) if self.config.xforwarded == true => {
+                let mut ips: Vec<&str> = ips_string.split(", ").collect();
                 ips.reverse();
 
                 ips.get(self.config.xforwarded_index).unwrap().to_string()
             },
-            _ => req.remote_addr.to_string(),
+            _ => req.ip,
         };
 
         let uploader = hash_ip(self.config.salt.clone(), ip.clone());
@@ -171,11 +188,7 @@ impl Flup {
             return Err(UploadError::SetIp);
         }
 
-        guard!(let Ok(params) = req.get_ref::<Params>() else {
-             return Err(UploadError::NoPostParams);
-        });
-
-        guard!(let Some(&Value::File(ref file)) = params.get("file") else {
+        guard!(let Some(file) = post.file else {
             return Err(UploadError::InvalidFileData);
         });
 
@@ -224,20 +237,15 @@ impl Flup {
                 _ => "file".to_string(),
             };
 
-            let desc = match params.get("desc") {
-                Some(&Value::String(ref desc)) => {
+            let desc = match post.desc {
+                Some(desc) => {
                     if desc.len() > 100 {
                         return Err(UploadError::DescTooLong);
                     }
 
                     desc
                 },
-                _ => "(none)",
-            };
-
-            let is_public = match params.get("public") {
-                Some(&Value::String(ref toggle)) if toggle == "on" => true,
-                _ => false,
+                _ => "(none)".to_string(),
             };
 
             let file_info = FileInfo {
@@ -247,7 +255,7 @@ impl Flup {
                 uploader: uploader,
             };
 
-            if let Err(_) = self.db.add_file(file_id.clone(), file_info.clone(), is_public) {
+            if let Err(_) = self.db.add_file(file_id.clone(), file_info.clone(), post.public) {
                 return Err(UploadError::AddFile);
             }
         }
@@ -294,7 +302,49 @@ impl FlupHandler {
     }
 
     pub fn handle_upload(&self, req: &mut Request) -> IronResult<Response> {
-        match self.flup.upload(req) {
+        let xforwarded = match req.headers.get_raw("X-Forwarded-For") {
+            Some(data) if data.len() == 1 => {
+                Some(String::from_utf8(data[0].clone()).unwrap())
+            },
+            _ => None,
+        };
+
+        let post = match req.get_ref::<Params>() {
+            Ok(params) => {
+                let file = match params.get("file") {
+                    Some(&Value::File(ref file)) => Some(file.clone()),
+                    _ => None,
+                };
+
+                let desc = match params.get("desc") {
+                    Some(&Value::String(ref desc)) => Some(desc.clone()),
+                    _ => None,
+                };
+
+                let is_public = match params.get("public") {
+                    Some(&Value::String(ref toggle)) if toggle == "on" => true,
+                    _ => false,
+                };
+
+                Some(UploadRequestPost {
+                    file: file,
+
+                    public: is_public,
+                    desc: desc,
+                })
+            },
+            _ => None,
+        };
+
+        let flup_req = UploadRequest {
+            xforwarded: xforwarded,
+
+            post: post,
+
+            ip: req.remote_addr.to_string(),
+        };
+
+        match self.flup.upload(flup_req) {
             Ok(file_id) => {
                 let url = format!("{}/{}", self.flup.config.url, file_id);
                 Ok(Response::with((Status::Ok, format!("{}", url))))
