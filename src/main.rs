@@ -272,47 +272,35 @@ fn get_config() -> FlupConfig {
 fn new_flup_router(flup_handler: FlupHandler) -> Router {
     let mut router = Router::new();
 
-    {
-        let flup_handler = flup_handler.clone();
-        router.post("/", move |req: &mut Request| {
-            flup_handler.handle_upload(req)
-        });
-    }
+    let flup_handler_clone = flup_handler.clone();
+    router.post("/", move |req: &mut Request| {
+        flup_handler_clone.handle_upload(req)
+    });
 
-    {
-        let flup_handler = flup_handler.clone();
-        router.get("/:id", move |req: &mut Request| {
-            flup_handler.handle_file_by_id(req)
-        });
-    }
+    let flup_handler_clone = flup_handler.clone();
+    router.get("/:id", move |req: &mut Request| {
+        flup_handler_clone.handle_file_by_id(req)
+    });
 
-    {
-        let flup_handler = flup_handler.clone();
-        router.get("/:id/*", move |req: &mut Request| {
-            flup_handler.handle_file(req)
-        });
-    }
+    let flup_handler_clone = flup_handler.clone();
+    router.get("/:id/*", move |req: &mut Request| {
+        flup_handler_clone.handle_file(req)
+    });
 
-    {
-        let flup_handler = flup_handler.clone();
-        router.get("/uploads", move |req: &mut Request| {
-            flup_handler.handle_uploads(req)
-        });
-    }
+    let flup_handler_clone = flup_handler.clone();
+    router.get("/uploads", move |req: &mut Request| {
+        flup_handler_clone.handle_uploads(req)
+    });
 
-    {
-        let flup_handler = flup_handler.clone();
-        router.get("/about", move |req: &mut Request| {
-            flup_handler.handle_about(req)
-        });
-    }
+    let flup_handler_clone = flup_handler.clone();
+    router.get("/about", move |req: &mut Request| {
+        flup_handler_clone.handle_about(req)
+    });
 
-    {
-        let flup_handler = flup_handler.clone();
-        router.get("/", move |req: &mut Request| {
-            flup_handler.handle_home(req)
-        });
-    }
+    let flup_handler_clone = flup_handler.clone();
+    router.get("/", move |req: &mut Request| {
+        flup_handler_clone.handle_home(req)
+    });
 
     router
 }
