@@ -63,9 +63,20 @@ impl FlupHandler {
 
         let params = match req.get_ref::<Params>() {
             Ok(params) => {
-                let file = match params.get("file") {
-                    Some(&Value::File(ref file)) => Some(file.clone()),
-                    _ => None,
+                let files = match params.get("files") {
+                    Some(&Value::Array(ref file_values)) => {
+                        let mut files = vec![];
+
+                        for value in file_values {
+                            if let &Value::File(ref file) = value {
+                                files.push(file.clone())
+                            }
+                        }
+
+                        files
+                    },
+                    Some(&Value::File(ref file)) => vec![file.clone()],
+                    _ => vec![],
                 };
 
                 let desc = match params.get("desc") {
@@ -79,7 +90,7 @@ impl FlupHandler {
                 };
 
                 Some(UploadRequestParams {
-                    file: file,
+                    files: files,
 
                     public: is_public,
                     desc: desc,
@@ -97,8 +108,8 @@ impl FlupHandler {
         };
 
         match self.flup.upload(flup_req) {
-            Ok(file_id) => {
-                let url = format!("{}/{}", self.flup.config.url, file_id);
+            Ok(file_ids) => {
+                let url = format!("{}/{}", self.flup.config.url, file_ids.join(" "));
                 Ok(Response::with((Status::Ok, format!("{}", url))))
             },
             Err(error) => {

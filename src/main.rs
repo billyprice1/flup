@@ -84,7 +84,7 @@ pub enum StartError {
 }
 
 pub struct UploadRequestParams {
-    file: Option<params::File>,
+    files: Vec<params::File>,
 
     public: bool,
     desc: Option<String>,
@@ -143,7 +143,7 @@ impl Flup {
         })
     }
 
-    pub fn upload(&self, req: UploadRequest) -> Result<String, UploadError> {
+    pub fn upload(&self, req: UploadRequest) -> Result<Vec<String>, UploadError> {
         guard!(let Some(params) = req.params else {
             return Err(UploadError::NoPostParams);
         });
@@ -163,76 +163,78 @@ impl Flup {
             return Err(UploadError::SetIp);
         }
 
-        guard!(let Some(file) = params.file else {
-            return Err(UploadError::InvalidFileData);
-        });
-
-        if file.size() == 0 {
-            return Err(UploadError::FileEmpty);
-        } else if file.size() > 8388608 {
-            return Err(UploadError::FileTooBig);
-        }
-
-        let file_data = if let Ok(mut handle) = file.open() {
-            let mut buf = vec![];
-
-            if let Err(_) = handle.read_to_end(&mut buf) {
-                return Err(UploadError::ReadData);
-            }
-
-            buf
-        } else {
-            return Err(UploadError::OpenUploadFile);
+        let desc = match params.desc {
+            Some(ref desc) if desc.len() > 100 => {
+                return Err(UploadError::DescTooLong);
+            },
+            Some(desc) => desc,
+            _ => "(none)".to_string(),
         };
 
-        let file_id = hash_file(&file_data);
+        let mut file_ids = vec![];
 
-        if let Err(_) = self.db.get_file(file_id.to_string()) {
-            if let Err(_) = self.fs.write_file(file_id.clone(), file_data) {
-                return Err(UploadError::WriteFile);
+        for file in params.files {
+            if file.size() == 0 {
+                return Err(UploadError::FileEmpty);
+            } else if file.size() > 8388608 {
+                return Err(UploadError::FileTooBig);
             }
 
-            let filename = match file.filename()  {
-                Some(filename) if filename.len() != 0 => {
-                    let path = Path::new(filename);
+            let file_data = if let Ok(mut handle) = file.open() {
+                let mut buf = vec![];
 
-                    let base_str = path.file_stem().unwrap().to_str().unwrap();
-                    let short_base: String = base_str.chars().take(45).collect();
+                if let Err(_) = handle.read_to_end(&mut buf) {
+                    return Err(UploadError::ReadData);
+                }
 
-                    match path.extension() {
-                        Some(ext) => {
-                            let ext_str = ext.to_str().unwrap();
-                            let short_ext: String = ext_str.chars().take(10).collect();
-
-                            format!("{}.{}", short_base, short_ext)
-                        },
-                        None => short_base,
-                    }
-                },
-                _ => "file".to_string(),
+                buf
+            } else {
+                return Err(UploadError::OpenUploadFile);
             };
 
-            let desc = match params.desc {
-                Some(ref desc) if desc.len() > 100 => {
-                    return Err(UploadError::DescTooLong);
-                },
-                Some(desc) => desc,
-                _ => "(none)".to_string(),
-            };
+            let file_id = hash_file(&file_data);
 
-            let file_info = FileInfo {
-                name: filename,
-                desc: desc.to_string(),
-                file_id: file_id.clone(),
-                uploader: uploader,
-            };
+            if let Err(_) = self.db.get_file(file_id.to_string()) {
+                if let Err(_) = self.fs.write_file(file_id.clone(), file_data) {
+                    return Err(UploadError::WriteFile);
+                }
 
-            if let Err(_) = self.db.add_file(file_id.clone(), file_info.clone(), params.public) {
-                return Err(UploadError::AddFile);
+                let filename = match file.filename()  {
+                    Some(filename) if filename.len() != 0 => {
+                        let path = Path::new(filename);
+
+                        let base_str = path.file_stem().unwrap().to_str().unwrap();
+                        let short_base: String = base_str.chars().take(45).collect();
+
+                        match path.extension() {
+                            Some(ext) => {
+                                let ext_str = ext.to_str().unwrap();
+                                let short_ext: String = ext_str.chars().take(10).collect();
+
+                                format!("{}.{}", short_base, short_ext)
+                            },
+                            None => short_base,
+                        }
+                    },
+                    _ => "file".to_string(),
+                };
+
+                let file_info = FileInfo {
+                    name: filename,
+                    desc: desc.clone(),
+                    file_id: file_id.clone(),
+                    uploader: uploader.clone(),
+                };
+
+                if let Err(_) = self.db.add_file(file_id.clone(), file_info, params.public) {
+                    return Err(UploadError::AddFile);
+                }
             }
+
+            file_ids.push(file_id);
         }
 
-        Ok(file_id)
+        Ok(file_ids)
     }
 
     pub fn file_by_id(&self, req: IdGetRequest) -> Result<(String, FileInfo), IdGetError> {
