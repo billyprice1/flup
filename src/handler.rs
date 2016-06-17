@@ -16,6 +16,27 @@ use std::path::Path;
 use hbs::Template;
 
 #[derive(ToJson)]
+struct JsonFile {
+    name: String,
+    url: String,
+    hash: String,
+    size: usize,
+}
+
+#[derive(ToJson)]
+struct SuccessJsonResponse {
+    success: bool, // Always true
+    files: Vec<JsonFile>,
+}
+
+#[derive(ToJson)]
+struct ErrorJsonResponse {
+    success: bool, // Always false
+    errorcode: usize,
+    description: String,
+}
+
+#[derive(ToJson)]
 struct HomePageData {
     uploads_count: isize,
     public_uploads_count: isize,
@@ -58,7 +79,7 @@ impl FlupHandler {
         Ok(resp)
     }
 
-    pub fn handle_upload(&self, req: &mut Request) -> IronResult<Response> {
+    fn process_upload_request(&self, req: &mut Request) -> UploadRequest {
         let xforwarded = match req.headers.get_raw("X-Forwarded-For") {
             Some(data) if data.len() == 1 => {
                 Some(String::from_utf8(data[0].clone()).unwrap())
@@ -104,13 +125,17 @@ impl FlupHandler {
             _ => None,
         };
 
-        let flup_req = UploadRequest {
+        UploadRequest {
             xforwarded: xforwarded,
 
             params: params,
 
             ip: req.remote_addr.to_string(),
-        };
+        }
+    }
+
+    pub fn handle_upload(&self, req: &mut Request) -> IronResult<Response> {
+        let flup_req = self.process_upload_request(req);
 
         match self.flup.upload(flup_req) {
             Ok(file_ids) => {
@@ -164,13 +189,17 @@ impl FlupHandler {
         }
     }
 
-    pub fn handle_file_by_id(&self, req: &mut Request) -> IronResult<Response> {
+    fn process_file_by_id_request(&self, req: &mut Request) -> IdGetRequest {
         let router = req.extensions.get::<Router>().unwrap();
         let file_id = router.find("id").unwrap().to_string();
 
-        let flup_req = IdGetRequest {
+        IdGetRequest {
             file_id: file_id,
-        };
+        }
+    }
+
+    pub fn handle_file_by_id(&self, req: &mut Request) -> IronResult<Response> {
+        let flup_req = self.process_file_by_id_request(req);
 
         match self.flup.file_by_id(flup_req) {
             Ok((file_id, file_info)) => {
@@ -187,13 +216,17 @@ impl FlupHandler {
         }
     }
 
-    pub fn handle_file(&self, req: &mut Request) -> IronResult<Response> {
+    fn process_file_request(&self, req: &mut Request) -> GetRequest {
         let router = req.extensions.get::<Router>().unwrap();
         let file_id = router.find("id").unwrap().to_string();
 
-        let flup_req = GetRequest {
+        GetRequest {
             file_id: file_id,
-        };
+        }
+    }
+
+    pub fn handle_file(&self, req: &mut Request) -> IronResult<Response> {
+        let flup_req = self.process_file_request(req);
 
         match self.flup.file(flup_req) {
             Ok((file_info, file_data)) => {
