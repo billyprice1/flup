@@ -83,7 +83,7 @@ pub enum StartError {
     Io(io::Error),
 }
 
-pub struct UploadRequestPost {
+pub struct UploadRequestParams {
     file: Option<params::File>,
 
     public: bool,
@@ -93,7 +93,7 @@ pub struct UploadRequestPost {
 pub struct UploadRequest {
     xforwarded: Option<String>,
 
-    post: Option<UploadRequestPost>,
+    params: Option<UploadRequestParams>,
 
     ip: String,
 }
@@ -144,7 +144,7 @@ impl Flup {
     }
 
     pub fn upload(&self, req: UploadRequest) -> Result<String, UploadError> {
-        guard!(let Some(post) = req.post else {
+        guard!(let Some(params) = req.params else {
             return Err(UploadError::NoPostParams);
         });
 
@@ -163,7 +163,7 @@ impl Flup {
             return Err(UploadError::SetIp);
         }
 
-        guard!(let Some(file) = post.file else {
+        guard!(let Some(file) = params.file else {
             return Err(UploadError::InvalidFileData);
         });
 
@@ -212,14 +212,11 @@ impl Flup {
                 _ => "file".to_string(),
             };
 
-            let desc = match post.desc {
-                Some(desc) => {
-                    if desc.len() > 100 {
-                        return Err(UploadError::DescTooLong);
-                    }
-
-                    desc
+            let desc = match params.desc {
+                Some(ref desc) if desc.len() > 100 => {
+                    return Err(UploadError::DescTooLong);
                 },
+                Some(desc) => desc,
                 _ => "(none)".to_string(),
             };
 
@@ -230,7 +227,7 @@ impl Flup {
                 uploader: uploader,
             };
 
-            if let Err(_) = self.db.add_file(file_id.clone(), file_info.clone(), post.public) {
+            if let Err(_) = self.db.add_file(file_id.clone(), file_info.clone(), params.public) {
                 return Err(UploadError::AddFile);
             }
         }

@@ -61,7 +61,7 @@ impl FlupHandler {
             _ => None,
         };
 
-        let post = match req.get_ref::<Params>() {
+        let params = match req.get_ref::<Params>() {
             Ok(params) => {
                 let file = match params.get("file") {
                     Some(&Value::File(ref file)) => Some(file.clone()),
@@ -78,7 +78,7 @@ impl FlupHandler {
                     _ => false,
                 };
 
-                Some(UploadRequestPost {
+                Some(UploadRequestParams {
                     file: file,
 
                     public: is_public,
@@ -91,7 +91,7 @@ impl FlupHandler {
         let flup_req = UploadRequest {
             xforwarded: xforwarded,
 
-            post: post,
+            params: params,
 
             ip: req.remote_addr.to_string(),
         };
