@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>Lainfile</title>
+  <meta name=viewport content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+  <div id="wrapper">
+    <h1>Uploaded!</h1>
+
+    <div class="box">
+    {{#each uploaded}}
+        <div><a href="{{this}}">{{this}}</a> -- <a href="#" onclick="prompt('', '{{this}}')">Copy to clipboard</a></div>
+    {{~/each}}
+    </div>
+
+    <img src="/static/anime.png" id="anime">
+  </div>
+</body>
+</html>

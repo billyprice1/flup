@@ -22,6 +22,11 @@ struct HomePageData {
 }
 
 #[derive(ToJson)]
+struct UploadedPageData {
+    uploaded: Vec<String>,
+}
+
+#[derive(ToJson)]
 struct UploadsPageData {
     uploads: Vec<FileInfo>,
 }
@@ -109,8 +114,18 @@ impl FlupHandler {
 
         match self.flup.upload(flup_req) {
             Ok(file_ids) => {
-                let url = format!("{}/{}", self.flup.config.url, file_ids.join(" "));
-                Ok(Response::with((Status::Ok, format!("{}", url))))
+                let uploaded = file_ids.into_iter().map(|id| {
+                    format!("{}/{}", self.flup.config.url, id)
+                }).collect();
+
+
+                let data = UploadedPageData {
+                    uploaded: uploaded,
+                };
+
+                let mut resp = Response::new();
+                resp.set_mut(Template::new("uploaded", data)).set_mut(Status::Ok);
+                Ok(resp)
             },
             Err(error) => {
                 match error {
