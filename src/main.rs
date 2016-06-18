@@ -143,7 +143,7 @@ impl Flup {
         })
     }
 
-    pub fn upload(&self, req: UploadRequest) -> Result<Vec<String>, UploadError> {
+    pub fn upload(&self, req: UploadRequest) -> Result<Vec<FileInfo>, UploadError> {
         guard!(let Some(params) = req.params else {
             return Err(UploadError::NoPostParams);
         });
@@ -171,7 +171,7 @@ impl Flup {
             _ => "(none)".to_string(),
         };
 
-        let mut file_ids = vec![];
+        let mut files = vec![];
 
         for file in params.files {
             if file.size() == 0 {
@@ -194,7 +194,9 @@ impl Flup {
 
             let file_id = hash_file(&file_data);
 
-            if let Err(_) = self.db.get_file(file_id.to_string()) {
+            let file_info = if let Ok(file_info) = self.db.get_file(file_id.to_string()) {
+                file_info
+            } else {
                 if let Err(_) = self.fs.write_file(file_id.clone(), file_data) {
                     return Err(UploadError::WriteFile);
                 }
@@ -226,15 +228,17 @@ impl Flup {
                     uploader: uploader.clone(),
                 };
 
-                if let Err(_) = self.db.add_file(file_id.clone(), file_info, params.public) {
+                if let Err(_) = self.db.add_file(file_id, file_info.clone(), params.public) {
                     return Err(UploadError::AddFile);
                 }
-            }
 
-            file_ids.push(file_id);
+                file_info
+            };
+
+            files.push(file_info);
         }
 
-        Ok(file_ids)
+        Ok(files)
     }
 
     pub fn file_by_id(&self, req: IdGetRequest) -> Result<(String, FileInfo), IdGetError> {

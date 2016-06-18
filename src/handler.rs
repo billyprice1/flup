@@ -150,11 +150,10 @@ impl FlupHandler {
         let flup_req = self.process_upload_request(req);
 
         match self.flup.upload(flup_req) {
-            Ok(file_ids) => {
-                let uploaded = file_ids.into_iter().map(|id| {
-                    format!("{}/{}", self.flup.config.url, id)
+            Ok(files) => {
+                let uploaded = files.into_iter().map(|file_info| {
+                    format!("{}/{}", self.flup.config.url, file_info.file_id)
                 }).collect();
-
 
                 let data = UploadedPageData {
                     uploaded: uploaded,
@@ -205,13 +204,13 @@ impl FlupHandler {
         let flup_req = self.process_upload_request(req);
 
         match self.flup.upload(flup_req) {
-            Ok(file_ids) => {
-                let mut files = vec![];
+            Ok(files) => {
+                let mut json_files = vec![];
 
-                for file_id in file_ids {
-                    files.push(JsonFile {
-                        name: "todo".to_string(),
-                        url: format!("{}/{}", self.flup.config.url, file_id),
+                for file_info in files {
+                    json_files.push(JsonFile {
+                        name: file_info.name,
+                        url: format!("{}/{}", self.flup.config.url, file_info.file_id),
                         hash: "todo".to_string(),
                         size: 69,
                     })
@@ -219,7 +218,7 @@ impl FlupHandler {
 
                 let response = SuccessJsonResponse {
                     success: true,
-                    files: files,
+                    files: json_files,
                 };
 
                 Ok(Response::with((Status::Ok, json::encode(&response).unwrap())))
