@@ -52,6 +52,23 @@ fn hash_ip(salt: String, ip: String) -> String {
     hasher.result_str()
 }
 
+fn handle_filename(filename: &str) -> String {
+    let path = Path::new(filename);
+
+    let base_str = path.file_stem().unwrap().to_str().unwrap();
+    let short_base: String = base_str.chars().take(45).collect();
+
+    match path.extension() {
+        Some(ext) => {
+            let ext_str = ext.to_str().unwrap();
+            let short_ext: String = ext_str.chars().take(10).collect();
+
+            format!("{}.{}", short_base, short_ext)
+        },
+        None => short_base,
+    }
+}
+
 #[derive(Debug, Clone, RustcDecodable)]
 pub struct FlupConfig {
     host: String,
@@ -205,22 +222,7 @@ impl Flup {
                 }
 
                 let filename = match file.filename()  {
-                    Some(filename) if filename.len() != 0 => {
-                        let path = Path::new(filename);
-
-                        let base_str = path.file_stem().unwrap().to_str().unwrap();
-                        let short_base: String = base_str.chars().take(45).collect();
-
-                        match path.extension() {
-                            Some(ext) => {
-                                let ext_str = ext.to_str().unwrap();
-                                let short_ext: String = ext_str.chars().take(10).collect();
-
-                                format!("{}.{}", short_base, short_ext)
-                            },
-                            None => short_base,
-                        }
-                    },
+                    Some(filename) if filename.len() != 0 => handle_filename(filename),
                     _ => "file".to_string(),
                 };
 
