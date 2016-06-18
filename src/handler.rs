@@ -2,6 +2,8 @@ use super::*;
 
 extern crate mime_guess;
 
+use rustc_serialize::json;
+
 use params::{Params, Value};
 
 use iron::prelude::*;
@@ -15,7 +17,7 @@ use std::path::Path;
 
 use hbs::Template;
 
-#[derive(ToJson)]
+#[derive(RustcEncodable)]
 struct JsonFile {
     name: String,
     url: String,
@@ -23,17 +25,17 @@ struct JsonFile {
     size: usize,
 }
 
-#[derive(ToJson)]
+#[derive(RustcEncodable)]
 struct SuccessJsonResponse {
     success: bool, // Always true
     files: Vec<JsonFile>,
 }
 
-#[derive(ToJson)]
-struct ErrorJsonResponse {
+#[derive(RustcEncodable)]
+struct ErrorJsonResponse<'a> {
     success: bool, // Always false
     errorcode: usize,
-    description: String,
+    description: &'a str,
 }
 
 #[derive(ToJson)]
@@ -77,6 +79,16 @@ impl FlupHandler {
         let mut resp = Response::new();
         resp.set_mut(Template::new("error", data)).set_mut(status);
         Ok(resp)
+    }
+
+    fn json_error(&self, error_code: usize, text: &str) -> IronResult<Response> {
+        let json = json::encode(&ErrorJsonResponse {
+            success: false,
+            errorcode: error_code,
+            description: text,
+        }).unwrap();
+
+        Ok(Response::with((Status::Ok, json)))
     }
 
     fn process_upload_request(&self, req: &mut Request) -> UploadRequest {
@@ -134,7 +146,7 @@ impl FlupHandler {
         }
     }
 
-    pub fn handle_upload(&self, req: &mut Request) -> IronResult<Response> {
+    pub fn handle_upload_html(&self, req: &mut Request) -> IronResult<Response> {
         let flup_req = self.process_upload_request(req);
 
         match self.flup.upload(flup_req) {
@@ -187,6 +199,87 @@ impl FlupHandler {
                 }
             },
         }
+    }
+
+    pub fn handle_upload_json(&self, req: &mut Request) -> IronResult<Response> {
+        let flup_req = self.process_upload_request(req);
+
+        match self.flup.upload(flup_req) {
+            Ok(file_ids) => {
+                let mut files = vec![];
+
+                for file_id in file_ids {
+                    files.push(JsonFile {
+                        name: "todo".to_string(),
+                        url: format!("{}/{}", self.flup.config.url, file_id),
+                        hash: "todo".to_string(),
+                        size: 69,
+                    })
+                }
+
+                let response = SuccessJsonResponse {
+                    success: true,
+                    files: files,
+                };
+
+                Ok(Response::with((Status::Ok, json::encode(&response).unwrap())))
+            },
+            Err(error) => {
+                match error {
+                    UploadError::SetIp => {
+                        self.json_error(500, "Error adding IP to temp DB")
+                    },
+                    UploadError::NoPostParams => {
+                        self.json_error(400, "No POST params found")
+                    },
+                    UploadError::InvalidFileData => {
+                        self.json_error(400, "Invalid file data found")
+                    },
+                    UploadError::FileEmpty => {
+                        self.json_error(400, "Specified file is empty")
+                    },
+                    UploadError::FileTooBig => {
+                        self.json_error(400, "File exceeds our limit")
+                    },
+                    UploadError::OpenUploadFile => {
+                        self.json_error(500, "Error opening uploaded file")
+                    },
+                    UploadError::ReadData => {
+                        self.json_error(500, "Error reading file data")
+                    },
+                    UploadError::WriteFile => {
+                        self.json_error(500, "Error writing to file")
+                    },
+                    UploadError::DescTooLong => {
+                        self.json_error(400, "Description too long")
+                    },
+                    UploadError::AddFile => {
+                        self.json_error(500, "Error adding file to DB")
+                    },
+                }
+            },
+        }
+    }
+
+    pub fn handle_upload(&self, req: &mut Request) -> IronResult<Response> {
+        let query_string = req.url.query.clone().unwrap_or("".to_string());
+
+        for q in query_string.split("&").collect::<Vec<&str>>() {
+            if let Some(i) = q.find("=") {
+                let (key, value) = q.split_at(i);
+
+                let value = &value[1..];
+
+                if key == "output" {
+                    match value {
+                        "json" => return self.handle_upload_json(req),
+                        _ => return Ok(Response::with((Status::BadRequest, "Bad output type"))),
+                    }
+                }
+            }
+        }
+
+        self.handle_upload_html(req)
     }
 
     fn process_file_by_id_request(&self, req: &mut Request) -> IdGetRequest {
