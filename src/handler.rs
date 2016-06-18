@@ -200,6 +200,60 @@ impl FlupHandler {
         }
     }
 
+    pub fn handle_upload_text(&self, trailing: bool, req: &mut Request) -> IronResult<Response> {
+        let flup_req = self.process_upload_request(req);
+
+        match self.flup.upload(flup_req) {
+            Ok(files) => {
+                let urls = files.into_iter().map(|file_info| {
+                    format!("{}/{}", self.flup.config.url, file_info.file_id)
+                }).collect::<Vec<String>>();
+
+                let urls_string = if trailing {
+                    format!("{}\n", urls.join("\n"))
+                } else {
+                    urls.join("\n")
+                };
+
+                Ok(Response::with((Status::Ok, urls_string)))
+            },
+            Err(error) => {
+                match error {
+                    UploadError::SetIp => {
+                        Ok(Response::with((Status::InternalServerError, "Error adding IP to temp DB")))
+                    },
+                    UploadError::NoPostParams => {
+                        Ok(Response::with((Status::BadRequest, "No POST params found")))
+                    },
+                    UploadError::InvalidFileData => {
+                        Ok(Response::with((Status::BadRequest, "Invalid file data found")))
+                    },
+                    UploadError::FileEmpty => {
+                        Ok(Response::with((Status::BadRequest, "Specified file is empty")))
+                    },
+                    UploadError::FileTooBig => {
+                        Ok(Response::with((Status::BadRequest, "File exceeds our limit")))
+                    },
+                    UploadError::OpenUploadFile => {
+                        Ok(Response::with((Status::InternalServerError, "Error opening uploaded file")))
+                    },
+                    UploadError::ReadData => {
+                        Ok(Response::with((Status::InternalServerError, "Error reading file data")))
+                    },
+                    UploadError::WriteFile => {
+                        Ok(Response::with((Status::InternalServerError, "Error writing to file")))
+                    },
+                    UploadError::DescTooLong => {
+                        Ok(Response::with((Status::BadRequest, "Description too long")))
+                    },
+                    UploadError::AddFile => {
+                        Ok(Response::with((Status::InternalServerError, "Error adding file to DB")))
+                    },
+                }
+            },
+        }
+    }
+
     pub fn handle_upload_json(&self, req: &mut Request) -> IronResult<Response> {
         let flup_req = self.process_upload_request(req);
 
@@ -271,6 +325,8 @@ impl FlupHandler {
 
                 if key == "output" {
                     match value {
+                        "text" => return self.handle_upload_text(true, req),
+                        "gyazo" => return self.handle_upload_text(false, req),
                         "json" => return self.handle_upload_json(req),
                         _ => return Ok(Response::with((Status::BadRequest, "Bad output type"))),
                     }
