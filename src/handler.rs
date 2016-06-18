@@ -211,7 +211,7 @@ impl FlupHandler {
                     json_files.push(JsonFile {
                         name: file_info.name,
                         url: format!("{}/{}", self.flup.config.url, file_info.file_id),
-                        hash: "todo".to_string(),
+                        hash: file_info.hash,
                         size: 69,
                     })
                 }

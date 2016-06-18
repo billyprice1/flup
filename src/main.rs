@@ -26,6 +26,7 @@ use std::fs::File;
 use std::path::Path;
 
 use crypto::md5::Md5;
+use crypto::sha1::Sha1;
 use crypto::digest::Digest;
 
 mod file;
@@ -67,6 +68,7 @@ pub struct FileInfo {
     name: String,
     desc: String,
     file_id: String,
+    hash: String,
     uploader: String,
 }
 
@@ -197,7 +199,7 @@ impl Flup {
             let file_info = if let Ok(file_info) = self.db.get_file(file_id.to_string()) {
                 file_info
             } else {
-                if let Err(_) = self.fs.write_file(file_id.clone(), file_data) {
+                if let Err(_) = self.fs.write_file(file_id.clone(), file_data.clone()) {
                     return Err(UploadError::WriteFile);
                 }
 
@@ -221,10 +223,18 @@ impl Flup {
                     _ => "file".to_string(),
                 };
 
+                let hash = {
+                    let mut hasher = Sha1::new();
+                    hasher.input(&file_data[..]);
+
+                    hasher.result_str()
+                };
+
                 let file_info = FileInfo {
                     name: filename,
                     desc: desc.clone(),
                     file_id: file_id.clone(),
+                    hash: hash,
                     uploader: uploader.clone(),
                 };
 
