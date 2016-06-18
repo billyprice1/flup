@@ -69,6 +69,7 @@ pub struct FileInfo {
     desc: String,
     file_id: String,
     hash: String,
+    size: u64,
     uploader: String,
 }
 
@@ -235,6 +236,7 @@ impl Flup {
                     desc: desc.clone(),
                     file_id: file_id.clone(),
                     hash: hash,
+                    size: file.size(),
                     uploader: uploader.clone(),
                 };
 

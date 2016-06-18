@@ -22,7 +22,7 @@ struct JsonFile {
     name: String,
     url: String,
     hash: String,
-    size: usize,
+    size: u64,
 }
 
 #[derive(RustcEncodable)]
@@ -212,7 +212,7 @@ impl FlupHandler {
                         name: file_info.name,
                         url: format!("{}/{}", self.flup.config.url, file_info.file_id),
                         hash: file_info.hash,
-                        size: 69,
+                        size: file_info.size,
                     })
                 }
 
