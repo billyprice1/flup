@@ -3,23 +3,10 @@
 
 #[macro_use] extern crate guard;
 extern crate rustc_serialize;
-extern crate iron;
-extern crate router;
-extern crate mount;
-extern crate params;
-extern crate handlebars_iron as hbs;
-extern crate staticfile;
 extern crate toml;
 extern crate crypto;
 
 use rustc_serialize::Decodable;
-
-use iron::prelude::*;
-use mount::Mount;
-use router::Router;
-
-use hbs::{HandlebarsEngine, DirectorySource};
-use staticfile::Static;
 
 use std::io::{self, Read};
 use std::fs::File;
@@ -37,14 +24,26 @@ use file::FlupFs;
 use db::FlupDb;
 use handler::FlupHandler;
 
-fn hash_file(file: &[u8]) -> String {
+/// Gets a 4 character long `String` from file data/bytes.
+/// # Examples
+///
+/// ```
+/// assert_eq!(hash_file(&[119, 101, 119, 108, 97, 100]), "775e");
+/// ```
+pub fn hash_file(file: &[u8]) -> String {
     let mut hasher = Md5::new();
     hasher.input(file);
 
     hasher.result_str()[..4].to_string()
 }
 
-fn hash_ip(salt: String, ip: String) -> String {
+/// Generates an MD5 hash of a `String`, used for hashing IPs
+/// # Examples
+///
+/// ```
+/// assert_eq!(hash_ip("127.0.0.1:55100"), "c3c38aa42f2c6581a7ff2e8065f345b5");
+/// ```
+pub fn hash_ip(salt: String, ip: String) -> String {
     let mut hasher = Md5::new();
     hasher.input(ip.as_bytes());
     hasher.input(salt.as_bytes());
@@ -52,8 +51,16 @@ fn hash_ip(salt: String, ip: String) -> String {
     hasher.result_str()
 }
 
-fn handle_filename(filename: &str) -> String {
-    let path = Path::new(filename);
+/// Processes filenames, shortening both the name, and if exists, the extension.
+/// # Examples
+///
+/// ```
+/// assert_eq!(handle_filename("fuckmyshitup.png"), "fuckmyshitup.png");
+/// assert_eq!(handle_filename("whatthefuckdidyoujustfuckingsayaboutmeyoulittlebitchillhaveyouknowigraduatedtopofmyclassinthenavysealsandivebeeninvolvedinnumeroussecretraidsonalquaedaandihaveover300confirmedkills.png"), "whatthefuckdidyoujustfuckingsayaboutmeyoulitt.png");
+/// assert_eq!(handle_filename("gen2isacuck.imprettyfuckingsurethisisnotafileextension"), "gen2isacuck.imprettyfu");
+/// ```
+pub fn handle_filename(filename: String) -> String {
+    let path = Path::new(filename.as_str());
 
     let base_str = path.file_stem().unwrap().to_str().unwrap();
     let short_base: String = base_str.chars().take(45).collect();
@@ -69,27 +76,46 @@ fn handle_filename(filename: &str) -> String {
     }
 }
 
+/// Configuration for Flup.
 #[derive(Debug, Clone, RustcDecodable)]
 pub struct FlupConfig {
-    host: String,
-    url: String,
+    /// The host to run the webserver on.
+    pub host: String,
+    /// The URL which the instance is running on.
+    pub url: String,
 
-    salt: String,
+    /// The salt used for hashing IPs.
+    pub salt: String,
 
-    xforwarded: bool,
-    xforwarded_index: usize,
+    /// Whether or not to use X-Forwarded-For at all
+    pub xforwarded: bool,
+    /// If using X-Forwarded-For, which header to trust.
+    pub xforwarded_index: usize,
 }
 
+/// File struct containing all stored file information minus the data.
 #[derive(Debug, Clone, ToJson, RustcEncodable, RustcDecodable)]
 pub struct FileInfo {
-    name: String,
-    desc: String,
-    file_id: String,
-    hash: String,
-    size: u64,
-    uploader: String,
+    /// The original filename of the file.
+    pub name: String,
+
+    /// The file's description.
+    pub desc: String,
+
+    /// The file's ID.
+    pub file_id: String,
+
+    /// The file's SHA1 hash.
+    pub hash: String,
+
+    /// The size of the file.
+    pub size: u64,
+
+    /// The file's uploader.
+    pub uploader: String,
 }
 
+/// Flup struct, containing the config, and internal db and fs structs.
 #[derive(Clone)]
 pub struct Flup {
     pub config: FlupConfig,
@@ -97,35 +123,49 @@ pub struct Flup {
     fs: FlupFs,
 }
 
+/// Possible Flup startup errors.
 #[derive(Debug)]
 pub enum StartError {
     Redis(db::RedisError),
     Io(io::Error),
 }
 
+/// POST params used in `UploadRequest`.
 pub struct UploadRequestParams {
-    files: Vec<params::File>,
+    /// List of files submitted for upload
+    pub files: Vec<(Option<File>, Option<String>)>,
 
-    public: bool,
-    desc: Option<String>,
+    /// Show on public list or not
+    pub public: bool,
+    /// Optional description
+    pub desc: Option<String>,
 }
 
+/// Upload request struct, contstructed by request handlers.
 pub struct UploadRequest {
-    xforwarded: Option<String>,
+    /// X-Forwarded-For header.
+    pub xforwarded: Option<String>,
 
-    params: Option<UploadRequestParams>,
+    /// POST params.
+    pub params: Option<UploadRequestParams>,
 
-    ip: String,
+    /// Uploader IP.
+    pub ip: String,
 }
 
+/// File ID request struct, contstructed by request handlers.
 pub struct IdGetRequest {
-    file_id: String,
+    /// File ID
+    pub file_id: String,
 }
 
+/// File request struct, contstructed by request handlers.
 pub struct GetRequest {
-    file_id: String,
+    /// File ID
+    pub file_id: String,
 }
 
+/// Possible upload errors
 #[derive(Debug)]
 pub enum UploadError {
     SetIp,
@@ -134,24 +174,28 @@ pub enum UploadError {
     FileEmpty,
     FileTooBig,
     OpenUploadFile,
+    GetMetadata,
     ReadData,
     WriteFile,
     DescTooLong,
     AddFile,
 }
 
+/// Possible get errors
 #[derive(Debug)]
 pub enum GetError {
     NotFound,
     FileNotFound
 }
 
+/// Possible ID get errors
 #[derive(Debug)]
 pub enum IdGetError {
     NotFound,
 }
 
 impl Flup {
+    /// Constructs a new `Flup` from a `FlupConfig`.
     pub fn new(config: FlupConfig) -> Result<Flup, StartError> {
         let db = try!(FlupDb::new());
         let fs = FlupFs::new();
@@ -163,6 +207,7 @@ impl Flup {
         })
     }
 
+    /// Uploads a file with data from an `UploadRequest`.
     pub fn upload(&self, req: UploadRequest) -> Result<Vec<FileInfo>, UploadError> {
         guard!(let Some(params) = req.params else {
             return Err(UploadError::NoPostParams);
@@ -193,24 +238,26 @@ impl Flup {
 
         let mut files = vec![];
 
-        for file in params.files {
-            if file.size() == 0 {
+        for (file, filename) in params.files {
+            guard!(let Some(mut file) = file else {
+                return Err(UploadError::OpenUploadFile);
+            });
+
+            let file_size = match file.metadata() {
+                Ok(file_metadata) => file_metadata.len(),
+                _ => return Err(UploadError::GetMetadata),
+            };
+
+            if file_size == 0 {
                 return Err(UploadError::FileEmpty);
-            } else if file.size() > 8388608 {
+            } else if file_size > 8388608 {
                 return Err(UploadError::FileTooBig);
             }
 
-            let file_data = if let Ok(mut handle) = file.open() {
-                let mut buf = vec![];
-
-                if let Err(_) = handle.read_to_end(&mut buf) {
-                    return Err(UploadError::ReadData);
-                }
-
-                buf
-            } else {
-                return Err(UploadError::OpenUploadFile);
-            };
+            let mut file_data = vec![];
+            if let Err(_) = file.read_to_end(&mut file_data) {
+                return Err(UploadError::ReadData);
+            }
 
             let file_id = hash_file(&file_data);
 
@@ -221,8 +268,8 @@ impl Flup {
                     return Err(UploadError::WriteFile);
                 }
 
-                let filename = match file.filename()  {
-                    Some(filename) if filename.len() != 0 => handle_filename(filename),
+                let filename = match filename  {
+                    Some(ref filename) if filename.len() != 0 => handle_filename(filename.clone()),
                     _ => "file".to_string(),
                 };
 
@@ -238,7 +285,7 @@ impl Flup {
                     desc: desc.clone(),
                     file_id: file_id.clone(),
                     hash: hash,
-                    size: file.size(),
+                    size: file_size,
                     uploader: uploader.clone(),
                 };
 
@@ -255,6 +302,7 @@ impl Flup {
         Ok(files)
     }
 
+    /// Gets a `FileInfo` by a file ID
     pub fn file_by_id(&self, req: IdGetRequest) -> Result<(String, FileInfo), IdGetError> {
         guard!(let Ok(file_info) = self.db.get_file(req.file_id.clone()) else {
             return Err(IdGetError::NotFound);
@@ -263,6 +311,7 @@ impl Flup {
         Ok((req.file_id, file_info))
     }
 
+    /// Gets a `FileInfo` and file data by a file ID
     pub fn file(&self, req: GetRequest) -> Result<(FileInfo, Vec<u8>), GetError> {
         guard!(let Ok(file_info) = self.db.get_file(req.file_id.clone()) else {
             return Err(GetError::NotFound);
@@ -276,6 +325,7 @@ impl Flup {
     }
 }
 
+/// Opens and parses `config.toml`.
 fn get_config() -> FlupConfig {
     let mut f = File::open("config.toml").unwrap();
     let mut data = String::new();
@@ -286,58 +336,9 @@ fn get_config() -> FlupConfig {
     FlupConfig::decode(&mut d).unwrap()
 }
 
-fn new_flup_router(flup_handler: FlupHandler) -> Router {
-    let mut router = Router::new();
-
-    let flup_handler_clone = flup_handler.clone();
-    router.post("/", move |req: &mut Request| {
-        flup_handler_clone.handle_upload(req)
-    });
-
-    let flup_handler_clone = flup_handler.clone();
-    router.get("/:id", move |req: &mut Request| {
-        flup_handler_clone.handle_file_by_id(req)
-    });
-
-    let flup_handler_clone = flup_handler.clone();
-    router.get("/:id/*", move |req: &mut Request| {
-        flup_handler_clone.handle_file(req)
-    });
-
-    let flup_handler_clone = flup_handler.clone();
-    router.get("/uploads", move |req: &mut Request| {
-        flup_handler_clone.handle_uploads(req)
-    });
-
-    let flup_handler_clone = flup_handler.clone();
-    router.get("/about", move |req: &mut Request| {
-        flup_handler_clone.handle_about(req)
-    });
-
-    let flup_handler_clone = flup_handler.clone();
-    router.get("/", move |req: &mut Request| {
-        flup_handler_clone.handle_home(req)
-    });
-
-    router
-}
-
 fn main() {
     let config = get_config();
-
-    let mut hbse = HandlebarsEngine::new();
-    hbse.add(Box::new(DirectorySource::new("./views/", ".hbs")));
-    hbse.reload().unwrap();
-
     let flup = Flup::new(config.clone()).unwrap();
-    let flup_handler = FlupHandler::new(flup);
 
-    let mut mount = Mount::new();
-    mount.mount("/", new_flup_router(flup_handler));
-    mount.mount("/static/", Static::new(Path::new("static")));
-
-    let mut chain = Chain::new(mount);
-    chain.link_after(hbse);
-
-    Iron::new(chain).http(config.host.as_str()).unwrap();
+    FlupHandler::start(flup);
 }

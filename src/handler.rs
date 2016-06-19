@@ -1,21 +1,30 @@
 use super::*;
 
 extern crate mime_guess;
+extern crate handlebars_iron as hbs;
+
+extern crate iron;
+extern crate router;
+extern crate mount;
+extern crate params;
+extern crate staticfile;
 
 use rustc_serialize::json;
 
-use params::{Params, Value};
+use self::params::{Params, Value};
 
-use iron::prelude::*;
-use iron::Url;
-use iron::status::Status;
-use iron::modifiers::Redirect;
+use self::iron::prelude::*;
+use self::iron::Url;
+use self::iron::status::Status;
+use self::iron::modifiers::Redirect;
 
-use router::Router;
+use self::staticfile::Static;
+use self::router::Router;
+use self::mount::Mount;
+
+use self::hbs::{Template, HandlebarsEngine, DirectorySource};
 
 use std::path::Path;
-
-use hbs::Template;
 
 #[derive(RustcEncodable)]
 struct JsonFile {
@@ -65,10 +74,55 @@ pub struct FlupHandler {
 }
 
 impl FlupHandler {
-    pub fn new(flup: Flup) -> FlupHandler {
-        FlupHandler {
-            flup: flup,
-        }
+    pub fn start(flup: Flup) {
+        let mut router = Router::new();
+
+        let flup_handler = FlupHandler {
+            flup: flup.clone(),
+        };
+
+        let flup_handler_clone = flup_handler.clone();
+        router.post("/", move |req: &mut Request| {
+            flup_handler_clone.handle_upload(req)
+        });
+
+        let flup_handler_clone = flup_handler.clone();
+        router.get("/:id", move |req: &mut Request| {
+            flup_handler_clone.handle_file_by_id(req)
+        });
+
+        let flup_handler_clone = flup_handler.clone();
+        router.get("/:id/*", move |req: &mut Request| {
+            flup_handler_clone.handle_file(req)
+        });
+
+        let flup_handler_clone = flup_handler.clone();
+        router.get("/uploads", move |req: &mut Request| {
+            flup_handler_clone.handle_uploads(req)
+        });
+
+        let flup_handler_clone = flup_handler.clone();
+        router.get("/about", move |req: &mut Request| {
+            flup_handler_clone.handle_about(req)
+        });
+
+        let flup_handler_clone = flup_handler.clone();
+        router.get("/", move |req: &mut Request| {
+            flup_handler_clone.handle_home(req)
+        });
+
+        let mut hbse = HandlebarsEngine::new();
+        hbse.add(Box::new(DirectorySource::new("./views/", ".hbs")));
+        hbse.reload().unwrap();
+
+        let mut mount = Mount::new();
+        mount.mount("/", router);
+        mount.mount("/static/", Static::new(Path::new("static")));
+
+        let mut chain = Chain::new(mount);
+        chain.link_after(hbse);
+
+        Iron::new(chain).http(flup.config.host.as_str()).unwrap();
     }
 
     fn error_page(&self, status: Status, text: &str) -> IronResult<Response> {
@@ -101,21 +155,19 @@ impl FlupHandler {
 
         let params = match req.get_ref::<Params>() {
             Ok(params) => {
-                let files = match params.get("files") {
-                    Some(&Value::Array(ref file_values)) => {
-                        let mut files = vec![];
+                let mut files = vec![];
 
+                match params.get("files") {
+                    Some(&Value::Array(ref file_values)) => {
                         for value in file_values {
                             if let &Value::File(ref file) = value {
-                                files.push(file.clone())
+                                let filename = file.filename().and_then(|x| Some(x.to_string()));
+                                files.push((file.open().ok(), filename))
                             }
                         }
-
-                        files
                     },
-                    Some(&Value::File(ref file)) => vec![file.clone()],
-                    _ => vec![],
-                };
+                    _ => {  },
+                }
 
                 let desc = match params.get("desc") {
                     Some(&Value::String(ref desc)) => Some(desc.clone()),
@@ -183,6 +235,9 @@ impl FlupHandler {
                     UploadError::OpenUploadFile => {
                         self.error_page(Status::InternalServerError, "Error opening uploaded file")
                     },
+                    UploadError::GetMetadata => {
+                        self.error_page(Status::InternalServerError, "Unable to get file metadata")
+                    },
                     UploadError::ReadData => {
                         self.error_page(Status::InternalServerError, "Error reading file data")
                     },
@@ -236,6 +291,9 @@ impl FlupHandler {
                     },
                     UploadError::OpenUploadFile => {
                         Ok(Response::with((Status::InternalServerError, "Error opening uploaded file")))
+                    },
+                    UploadError::GetMetadata => {
+                        Ok(Response::with((Status::InternalServerError, "Unable to get file metadata")))
                     },
                     UploadError::ReadData => {
                         Ok(Response::with((Status::InternalServerError, "Error reading file data")))
@@ -296,6 +354,9 @@ impl FlupHandler {
                     },
                     UploadError::OpenUploadFile => {
                         self.json_error(500, "Error opening uploaded file")
+                    },
+                    UploadError::GetMetadata => {
+                        self.json_error(500, "Unable to get file metadata")
                     },
                     UploadError::ReadData => {
                         self.json_error(500, "Error reading file data")
