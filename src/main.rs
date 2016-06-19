@@ -55,9 +55,12 @@ pub fn hash_ip(salt: String, ip: String) -> String {
 /// # Examples
 ///
 /// ```
-/// assert_eq!(handle_filename("fuckmyshitup.png"), "fuckmyshitup.png");
-/// assert_eq!(handle_filename("whatthefuckdidyoujustfuckingsayaboutmeyoulittlebitchillhaveyouknowigraduatedtopofmyclassinthenavysealsandivebeeninvolvedinnumeroussecretraidsonalquaedaandihaveover300confirmedkills.png"), "whatthefuckdidyoujustfuckingsayaboutmeyoulitt.png");
-/// assert_eq!(handle_filename("gen2isacuck.imprettyfuckingsurethisisnotafileextension"), "gen2isacuck.imprettyfu");
+/// assert_eq!(handle_filename("fuckmyshitup.png", false), "fuckmyshitup.png");
+/// assert_eq!(handle_filename("whatthefuckdidyoujustfuckingsayaboutmeyoulittlebitchillhaveyouknowigraduatedtopofmyclassinthenavysealsandivebeeninvolvedinnumeroussecretraidsonalquaedaandihaveover300confirmedkills.png", true), "whatthefuckdidyoujustfuckingsayaboutmeyoulitt.png");
+/// assert_eq!(handle_filename("gen2isacuck.imprettyfuckingsurethisisnotafileextension", false), "gen2isacuck.imprettyfu");
+///
+/// assert_eq!(handle_filename("embarrasingfilename.webm", true), "file.webm");
+/// assert_eq!(handle_filename("embarrasingfilename.imprettyfuckingsurethisisnotafileextension", true), "file.imprettyfu");
 /// ```
 pub fn handle_filename(filename: String, remove_filename: bool) -> String {
     let path = Path::new(filename.as_str());
