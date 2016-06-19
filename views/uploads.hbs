@@ -2,31 +2,31 @@
 
 <html>
 <head>
-	<title>Lainfile</title>
+	<title>Lainfile - Uploads</title>
 	<meta name=viewport content="width=device-width, initial-scale=1">
 
 	<link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
-	<div id="wrapper">
-		<h1>Uploads</h1>
-		<p>List of all public uploads, this is opt-in.</p>
+	<h1>Uploads</h1>
+	<p>List of all public uploads, this is opt-in.</p>
 
-		<hr>
+	<hr>
 
-		<div>
-			{{#each uploads}}
-			<div class="box">
-				<div>ID: <a href="/{{file_id}}">{{file_id}}</a></div>
-				<div>Name: <span class="break">{{name}}</span></div>
-				<div>Desc: <span class="break">{{desc}}</span></div>
-			</div>
-			<br>
-			{{~/each}}
+	<div>
+		{{#each uploads}}
+		<div class="box">
+			<div>ID: <a href="/{{file_id}}">{{file_id}}</a></div>
+			<div>Name: <span class="break">{{name}}</span></div>
+			<div>Desc: <span class="break">{{desc}}</span></div>
 		</div>
-
-		<img src="/static/anime.png" id="anime">
+		<br>
+		{{~/each}}
 	</div>
+
+	<img src="/static/anime.png" id="anime">
+
+    <script src="/static/script.js"></script>
 </body>
 </html>

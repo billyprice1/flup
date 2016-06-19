@@ -2,41 +2,41 @@
 
 <html>
 <head>
-	<title>Lainfile</title>
-	<meta name=viewport content="width=device-width, initial-scale=1">
+    <title>Lainfile</title>
+    <meta name=viewport content="width=device-width, initial-scale=1">
 
-	<link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
-	<h1 id="header">ｗｉｒｅｄ</h1>
+    <h1 id="header">ｗｉｒｅｄ</h1>
 
-	<form action="/" method="post" enctype="multipart/form-data">
-		<div class="box">
-			<label for="desc-input">Description (optional):</label>
-			<br>
-			<input type="text" name="desc" id="desc-input">
+    <form action="/" method="post" enctype="multipart/form-data">
+        <div class="box">
+            <label for="desc-input">Description (optional):</label>
+            <br>
+            <input type="text" name="desc" id="desc-input">
 
-			<br>
-			<br>
+            <br>
+            <br>
 
-			<label for="public-toggle">Show on public list:</label>
-			<input type="checkbox" name="public" id="public-toggle">
-		</div>
+            <label for="public-toggle">Show on public list:</label>
+            <input type="checkbox" name="public" id="public-toggle">
+        </div>
 
-		<div class="box">
-			<input type="file" name="files[]" id="file-select" multiple>
-		</div>
+        <div class="box">
+            <input type="file" name="files[]" id="file-select" multiple>
+        </div>
 
-		<input type="submit" value="Upload!" id="upload">
-	</form>
+        <input type="submit" value="Upload!" id="upload">
+    </form>
 
-	<h5><a href="/about">about page</a></h5>
+    <h5><a href="/about">about page</a></h5>
 
-	<img src="/static/anime.png" id="anime">
+    <img src="/static/anime.png" id="anime">
 
-	<footer>There are currently {{ uploads_count }} uploads, and {{ public_uploads_count }} <a href="uploads">public uploads</a>!</footer>
+    <footer>There are currently {{ uploads_count }} uploads, and {{ public_uploads_count }} <a href="uploads">public uploads</a>!</footer>
 
-	<script src="/static/script.js"></script>
+    <script src="/static/script.js"></script>
 </body>
 </html>
