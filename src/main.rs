@@ -76,6 +76,21 @@ pub fn handle_filename(filename: String) -> String {
     }
 }
 
+/// Handles an X-Forwarded-For string and selects the appropriate index
+/// # Examples
+///
+/// ```
+/// assert_eq!(handle_xforwarded("totally not injected, 8.8.8.8", 1), "8.8.8.8");
+/// assert_eq!(handle_xforwarded("8.8.8.8", 1), "8.8.8.8");
+/// assert_eq!(handle_xforwarded("totally not injected, 8.8.8.8, 127.0.0.1", 2), "8.8.8.8");
+/// ```
+pub fn handle_xforwarded(ips_string: String, i: usize) -> String {
+    let mut ips: Vec<&str> = ips_string.split(", ").collect();
+    ips.reverse();
+
+    ips.get(i).unwrap().to_string()
+}
+
 /// Configuration for Flup.
 #[derive(Debug, Clone, RustcDecodable)]
 pub struct FlupConfig {
@@ -215,10 +230,7 @@ impl Flup {
 
         let ip = match req.xforwarded {
             Some(ref ips_string) if self.config.xforwarded == true => {
-                let mut ips: Vec<&str> = ips_string.split(", ").collect();
-                ips.reverse();
-
-                ips.get(self.config.xforwarded_index).unwrap().to_string()
+                handle_xforwarded(ips_string.clone(), self.config.xforwarded_index)
             },
             _ => req.ip,
         };
