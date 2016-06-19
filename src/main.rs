@@ -59,11 +59,15 @@ pub fn hash_ip(salt: String, ip: String) -> String {
 /// assert_eq!(handle_filename("whatthefuckdidyoujustfuckingsayaboutmeyoulittlebitchillhaveyouknowigraduatedtopofmyclassinthenavysealsandivebeeninvolvedinnumeroussecretraidsonalquaedaandihaveover300confirmedkills.png"), "whatthefuckdidyoujustfuckingsayaboutmeyoulitt.png");
 /// assert_eq!(handle_filename("gen2isacuck.imprettyfuckingsurethisisnotafileextension"), "gen2isacuck.imprettyfu");
 /// ```
-pub fn handle_filename(filename: String) -> String {
+pub fn handle_filename(filename: String, remove_filename: bool) -> String {
     let path = Path::new(filename.as_str());
 
-    let base_str = path.file_stem().unwrap().to_str().unwrap();
-    let short_base: String = base_str.chars().take(45).collect();
+    let short_base = if remove_filename {
+        "file".to_string()
+    } else {
+        let base_str = path.file_stem().unwrap().to_str().unwrap();
+        base_str.chars().take(45).collect::<String>()
+    };
 
     match path.extension() {
         Some(ext) => {
@@ -151,7 +155,9 @@ pub struct UploadRequestParams {
     pub files: Vec<(Option<File>, Option<String>)>,
 
     /// Show on public list or not
-    pub public: bool,
+    pub is_public: bool,
+    /// Whether to replace the filename and leave only the extension
+    pub no_filename: bool,
     /// Optional description
     pub desc: Option<String>,
 }
@@ -281,7 +287,12 @@ impl Flup {
                 }
 
                 let filename = match filename  {
-                    Some(ref filename) if filename.len() != 0 => handle_filename(filename.clone()),
+                    Some(ref filename) if filename.len() != 0 && params.no_filename == false => {
+                        handle_filename(filename.clone(), false)
+                    },
+                    Some(ref filename) if filename.len() != 0 => {
+                        handle_filename(filename.clone(), true)
+                    },
                     _ => "file".to_string(),
                 };
 
@@ -301,7 +312,7 @@ impl Flup {
                     uploader: uploader.clone(),
                 };
 
-                if let Err(_) = self.db.add_file(file_id, file_info.clone(), params.public) {
+                if let Err(_) = self.db.add_file(file_id, file_info.clone(), params.is_public) {
                     return Err(UploadError::AddFile);
                 }
 
