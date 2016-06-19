@@ -87,6 +87,11 @@ impl FlupHandler {
         });
 
         let flup_handler_clone = flup_handler.clone();
+        router.post("/upload.php", move |req: &mut Request| { // legacy
+            flup_handler_clone.handle_upload(req)
+        });
+
+        let flup_handler_clone = flup_handler.clone();
         router.get("/:id", move |req: &mut Request| {
             flup_handler_clone.handle_file_by_id(req)
         });
