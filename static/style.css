@@ -26,6 +26,8 @@ a, a:visited {
 }
 
 input[type="text"] {
+    background: #CCC;
+    color: #111;
     border: none;
     border-radius: 2px;
 }
@@ -46,6 +48,15 @@ label.checkbox-wrapper {
     display: inline-block;
     margin-bottom: -3px;
     border-radius: 3px;
+}
+
+.no-highlight {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
 
 .box::before {
