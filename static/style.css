@@ -1,6 +1,6 @@
 body {
 	text-align: center;
-	background: #222;
+	background: #111;
 	color: #CCC;
 	width: 400px;
 	margin: auto;
@@ -14,7 +14,7 @@ body {
 
 *::selection {
 	color: #CCC;
-	background: #595;
+	background: #195;
 }
 
 footer {
@@ -22,7 +22,7 @@ footer {
 }
 
 a, a:visited {
-	color: #595;
+	color: #195;
 }
 
 input[type="text"] {
@@ -30,8 +30,34 @@ input[type="text"] {
 	border-radius: 2px;
 }
 
+input[type="checkbox"] {
+	display: none;
+}
+
+input[type="checkbox"]:checked + label {
+	background: #595;
+}
+
+label.checkbox-wrapper {
+	height: 16px;
+	width: 16px;
+	margin: 4px;
+	background: #CCC;
+	display: inline-block;
+	margin-bottom: -3px;
+	border-radius: 3px;
+}
+
+.box::before {
+	height: 20px;
+	display: block;
+	content: "";
+	background: #195;
+	margin-bottom: 10px;
+}
+
 .box {
-	background: #444;
+	background: #222;
 	margin: 20px 0;
 	border-radius: 3px;
 	padding: 10px;
@@ -42,7 +68,9 @@ input[type="text"] {
 }
 
 #header {
-	font-size: 60px;
+	color: #195;
+	font-size: 80px;
+	font-weight: 500;
 	line-height: 1;
 	margin: 20px 0 40px;
 }
@@ -60,7 +88,7 @@ input[type="text"] {
 }
 
 #upload {
-	background: #595;
+	background: #195;
 	color: #EEE;
 	width: 150px;
 	height: 50px;
