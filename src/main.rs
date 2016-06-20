@@ -65,11 +65,12 @@ pub fn hash_ip(salt: String, ip: String) -> String {
 pub fn handle_filename(filename: String, remove_filename: bool) -> String {
     let path = Path::new(filename.as_str());
 
-    let short_base = if remove_filename {
-        "file".to_string()
-    } else {
-        let base_str = path.file_stem().unwrap().to_str().unwrap();
-        base_str.chars().take(45).collect::<String>()
+    let short_base = match remove_filename {
+        true => "file".to_string(),
+        false => {
+            let base_str = path.file_stem().unwrap().to_str().unwrap();
+            base_str.chars().take(45).collect::<String>()
+        },
     };
 
     match path.extension() {
@@ -120,7 +121,6 @@ pub struct FlupConfig {
 pub struct FileInfo {
     /// The original filename of the file.
     pub name: String,
-
     /// The file's description.
     pub desc: String,
 
@@ -129,7 +129,6 @@ pub struct FileInfo {
 
     /// The file's SHA1 hash.
     pub hash: String,
-
     /// The size of the file.
     pub size: u64,
 
