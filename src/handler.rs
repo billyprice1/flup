@@ -275,10 +275,9 @@ impl FlupHandler {
                     format!("{}/{}", self.flup.config.url, file_info.file_id)
                 }).collect::<Vec<String>>();
 
-                let urls_string = if trailing {
-                    format!("{}\n", urls.join("\n"))
-                } else {
-                    urls.join("\n")
+                let urls_string = match trailing {
+                    true => format!("{}\n", urls.join("\n")),
+                    false => urls.join("\n"),
                 };
 
                 Ok(Response::with((Status::Ok, urls_string)))
@@ -387,26 +386,22 @@ impl FlupHandler {
     }
 
     pub fn handle_upload(&self, req: &mut Request) -> IronResult<Response> {
-        let query_string = req.url.query.clone().unwrap_or("".to_string());
-
-        for q in query_string.split("&").collect::<Vec<&str>>() {
-            if let Some(i) = q.find("=") {
-                let (key, value) = q.split_at(i);
-
-                let value = &value[1..];
-
-                if key == "output" {
-                    match value {
-                        "text" => return self.handle_upload_text(true, req),
-                        "gyazo" => return self.handle_upload_text(false, req),
-                        "json" => return self.handle_upload_json(req),
-                        _ => return Ok(Response::with((Status::BadRequest, "Bad output type"))),
-                    }
+        let output_type = match req.get_ref::<Params>() {
+            Ok(params) => {
+                match params.get("output") {
+                    Some(&Value::String(ref output_type)) => Some(output_type.clone()),
+                    _ => None,
                 }
             }
-        }
+            _ => None,
+        };
 
-        self.handle_upload_html(req)
+        match output_type.unwrap_or("".to_string()).as_str() {
+            "text" => self.handle_upload_text(true, req),
+            "gyazo" => self.handle_upload_text(false, req),
+            "json" => self.handle_upload_json(req),
+            _ => self.handle_upload_html(req),
+        }
     }
 
     fn process_file_by_id_request(&self, req: &mut Request) -> IdGetRequest {
