@@ -51,11 +51,11 @@ key: `xforwarded_index`
 If using X-Forwarded-For, which header to trust.
 
 #### Examples
->If using a single proxy: `1`
+>If using a single proxy: `0`
 
->If using a proxy and Cloudflare: `2`
+>If using a proxy and Cloudflare: `1`
 
->If using 99 proxies (jesus fuck): `99`
+>If using 99 proxies (jesus fuck): `98`
 
 ## License
 Copyright © `>current year` Installgen2

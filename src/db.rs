@@ -67,23 +67,6 @@ impl FlupDb {
         }
     }
 
-    pub fn set_ip(&self, hash: String, ip: String) -> redis::RedisResult<()> {
-        let redis = self.redis.get().unwrap();
-
-        try!(redis.hset("flup::ips", hash, ip));
-
-        Ok(())
-    }
-
-    pub fn get_ip(&self, hash: String) -> redis::RedisResult<String> {
-        let redis = self.redis.get().unwrap();
-
-        match redis.hget("flup::ips", hash) {
-            Ok(ip) => Ok(ip),
-            Err(error) => Err(error),
-        }
-    }
-
     pub fn get_uploads(&self) -> redis::RedisResult<Vec<FileInfo>> {
         let redis = self.redis.get().unwrap();
 

@@ -88,9 +88,9 @@ pub fn handle_filename(filename: String, remove_filename: bool) -> String {
 /// # Examples
 ///
 /// ```
-/// assert_eq!(handle_xforwarded("totally not injected, 8.8.8.8", 1), "8.8.8.8");
-/// assert_eq!(handle_xforwarded("8.8.8.8", 1), "8.8.8.8");
-/// assert_eq!(handle_xforwarded("totally not injected, 8.8.8.8, 127.0.0.1", 2), "8.8.8.8");
+/// assert_eq!(handle_xforwarded("totally not injected, 8.8.8.8".to_string(), 0), "8.8.8.8");
+/// assert_eq!(handle_xforwarded("8.8.8.8".to_string(), 0), "8.8.8.8");
+/// assert_eq!(handle_xforwarded("totally not injected, 8.8.8.8, 127.0.0.1".to_string(), 1), "8.8.8.8");
 /// ```
 pub fn handle_xforwarded(ips_string: String, i: usize) -> String {
     let mut ips: Vec<&str> = ips_string.split(", ").collect();
@@ -139,7 +139,7 @@ pub struct FileInfo {
 /// Flup struct, containing the config, and internal db and fs structs.
 #[derive(Clone)]
 pub struct Flup {
-    pub config: FlupConfig,
+    config: FlupConfig,
     db: FlupDb,
     fs: FlupFs,
 }
@@ -244,9 +244,6 @@ impl Flup {
         };
 
         let uploader = hash_ip(self.config.salt.clone(), ip.clone());
-        if let Err(_) = self.db.set_ip(uploader.clone(), ip) {
-            return Err(UploadError::SetIp);
-        }
 
         let desc = match params.desc {
             Some(ref desc) if desc.len() > 100 => {
