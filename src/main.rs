@@ -84,6 +84,26 @@ pub fn handle_filename(filename: String, remove_filename: bool) -> String {
     }
 }
 
+/// Returns if given filename has an extension in the blocklist
+/// # Examples
+///
+/// ```
+/// assert_eq!(blocked_extension(&["exe".to_string()], &"wew.exe".to_string()), true);
+/// assert_eq!(blocked_extension(&["exe".to_string()], &"wew.png".to_string()), false);
+/// assert_eq!(blocked_extension(&["exe".to_string()], &"wew".to_string()), false);
+/// assert_eq!(blocked_extension(&[], &"wew.exe".to_string()), false);
+/// ```
+
+pub fn blocked_extension(blocked: &[String], filename: &String) -> bool {
+    if let Some(extension) = Path::new(filename.as_str()).extension() {
+        let extension_string = extension.to_str().unwrap().to_string();
+
+        blocked.contains(&extension_string)
+    } else {
+        false
+    }
+}
+
 /// Handles an X-Forwarded-For string and selects the appropriate index
 /// # Examples
 ///
@@ -109,6 +129,14 @@ pub struct FlupConfig {
 
     /// The salt used for hashing IPs.
     pub salt: String,
+
+    /// The key prefix used in Redis
+    pub redis_prefix: String,
+
+    /// List of file extensions to block requests for
+    pub no_access_extensions: Vec<String>,
+    /// List of file extensions to block uploads of
+    pub no_upload_extensions: Vec<String>,
 
     /// Whether or not to use X-Forwarded-For at all
     pub xforwarded: bool,
@@ -186,6 +214,8 @@ pub struct IdGetRequest {
 pub struct GetRequest {
     /// File ID
     pub file_id: String,
+    /// Filename
+    pub filename: String,
 }
 
 /// Possible upload errors
@@ -200,6 +230,7 @@ pub enum UploadError {
     GetMetadata,
     ReadData,
     WriteFile,
+    BlockedExtension,
     DescTooLong,
     AddFile,
 }
@@ -207,8 +238,9 @@ pub enum UploadError {
 /// Possible get errors
 #[derive(Debug)]
 pub enum GetError {
+    BlockedExtension,
     NotFound,
-    FileNotFound
+    FileNotFound,
 }
 
 /// Possible ID get errors
@@ -220,7 +252,7 @@ pub enum IdGetError {
 impl Flup {
     /// Constructs a new `Flup` from a `FlupConfig`.
     pub fn new(config: FlupConfig) -> Result<Flup, StartError> {
-        let db = try!(FlupDb::new());
+        let db = try!(FlupDb::new(config.redis_prefix.clone()));
         let fs = FlupFs::new();
 
         Ok(Flup {
@@ -295,6 +327,10 @@ impl Flup {
                     _ => "file".to_string(),
                 };
 
+                if blocked_extension(&self.config.no_upload_extensions, &filename) {
+                    return Err(UploadError::BlockedExtension);
+                }
+
                 let hash = {
                     let mut hasher = Sha1::new();
                     hasher.input(&file_data[..]);
@@ -335,6 +371,10 @@ impl Flup {
 
     /// Gets a `FileInfo` and file data by a file ID
     pub fn file(&self, req: GetRequest) -> Result<(FileInfo, Vec<u8>), GetError> {
+        if blocked_extension(&self.config.no_access_extensions, &req.filename) {
+            return Err(GetError::BlockedExtension);
+        }
+
         guard!(let Ok(file_info) = self.db.get_file(req.file_id.clone()) else {
             return Err(GetError::NotFound);
         });

@@ -97,7 +97,7 @@ impl FlupHandler {
         });
 
         let flup_handler_clone = flup_handler.clone();
-        router.get("/:id/*", move |req: &mut Request| {
+        router.get("/:id/:name", move |req: &mut Request| {
             flup_handler_clone.handle_file(req)
         });
 
@@ -255,6 +255,9 @@ impl FlupHandler {
                     UploadError::WriteFile => {
                         self.error_page(Status::InternalServerError, "Error writing to file")
                     },
+                    UploadError::BlockedExtension => {
+                        self.error_page(Status::BadRequest, "Uploading files with this extension is not allowed.")
+                    },
                     UploadError::DescTooLong => {
                         self.error_page(Status::BadRequest, "Description too long")
                     },
@@ -310,6 +313,9 @@ impl FlupHandler {
                     },
                     UploadError::WriteFile => {
                         Ok(Response::with((Status::InternalServerError, "Error writing to file")))
+                    },
+                    UploadError::BlockedExtension => {
+                        Ok(Response::with((Status::BadRequest, "Uploading files with this extension is not allowed.")))
                     },
                     UploadError::DescTooLong => {
                         Ok(Response::with((Status::BadRequest, "Description too long")))
@@ -374,6 +380,9 @@ impl FlupHandler {
                     UploadError::WriteFile => {
                         self.json_error(500, "Error writing to file")
                     },
+                    UploadError::BlockedExtension => {
+                        self.json_error(403, "Uploading files with this extension is not allowed.")
+                    },
                     UploadError::DescTooLong => {
                         self.json_error(400, "Description too long")
                     },
@@ -434,9 +443,11 @@ impl FlupHandler {
     fn process_file_request(&self, req: &mut Request) -> GetRequest {
         let router = req.extensions.get::<Router>().unwrap();
         let file_id = router.find("id").unwrap().to_string();
+        let filename = router.find("name").unwrap().to_string();
 
         GetRequest {
             file_id: file_id,
+            filename: filename,
         }
     }
 
@@ -452,6 +463,9 @@ impl FlupHandler {
                 match error {
                     GetError::NotFound => {
                         self.error_page(Status::NotFound, "File not found")
+                    },
+                    GetError::BlockedExtension => {
+                        self.error_page(Status::Unauthorized, "Fetching this extension is not allowed, try changing the filename in the url :^)")
                     },
                     GetError::FileNotFound => {
                         self.error_page(Status::NotFound, "File not found (on disk (oh fuck))")

@@ -16,6 +16,7 @@ use std::default::Default;
 #[derive(Clone)]
 pub struct FlupDb {
     redis: r2d2::Pool<RedisConnectionManager>,
+    key_prefix: String,
 }
 
 impl ToRedisArgs for FileInfo {
@@ -31,7 +32,7 @@ impl FromRedisValue for FileInfo {
 }
 
 impl FlupDb {
-    pub fn new() -> Result<FlupDb, StartError> {
+    pub fn new(key_prefix: String) -> Result<FlupDb, StartError> {
         let manager = match RedisConnectionManager::new("redis://127.0.0.1/") {
             Err(error) => return Err(StartError::Redis(error)),
             Ok(manager) => manager,
@@ -43,16 +44,17 @@ impl FlupDb {
 
         Ok(FlupDb {
             redis: pool,
+            key_prefix: key_prefix,
         })
     }
 
     pub fn add_file(&self, file_id: String, file: FileInfo, public: bool) -> redis::RedisResult<()> {
         let redis = self.redis.get().unwrap();
 
-        try!(redis.hset("flup::files", file_id.clone(), file));
+        try!(redis.hset(self.key_prefix.clone() + "::files", file_id.clone(), file));
 
         if public == true {
-            try!(redis.lpush("flup::publicfiles", file_id));
+            try!(redis.lpush(self.key_prefix.clone() + "::publicfiles", file_id));
         }
 
         Ok(())
@@ -61,7 +63,7 @@ impl FlupDb {
     pub fn get_file(&self, file_id: String) -> redis::RedisResult<FileInfo> {
         let redis = self.redis.get().unwrap();
 
-        match redis.hget("flup::files", file_id) {
+        match redis.hget(self.key_prefix.clone() + "::files", file_id) {
             Ok(files) => Ok(files),
             Err(error) => Err(error),
         }
@@ -70,7 +72,7 @@ impl FlupDb {
     pub fn get_uploads(&self) -> redis::RedisResult<Vec<FileInfo>> {
         let redis = self.redis.get().unwrap();
 
-        let public_ids: Vec<String> = try!(redis.lrange("flup::publicfiles", 0, 20));
+        let public_ids: Vec<String> = try!(redis.lrange(self.key_prefix.clone() + "::publicfiles", 0, 20));
 
         Ok(public_ids.into_iter().map(|key: String| {
             self.get_file(key).unwrap()
@@ -80,12 +82,12 @@ impl FlupDb {
     pub fn get_uploads_count(&self) -> redis::RedisResult<isize> {
         let redis = self.redis.get().unwrap();
 
-        Ok(try!(redis.hlen("flup::files")))
+        Ok(try!(redis.hlen(self.key_prefix.clone() + "::files")))
     }
 
     pub fn get_public_uploads_count(&self) -> redis::RedisResult<isize> {
         let redis = self.redis.get().unwrap();
 
-        Ok(try!(redis.llen("flup::publicfiles")))
+        Ok(try!(redis.llen(self.key_prefix.clone() + "::publicfiles")))
     }
 }
