@@ -32,14 +32,15 @@
 <body>
 <h1>Uploaded!</h1>
 
-    <div class="box">
+    <div class="box" id="uploads">
     {{#each uploaded}}
-        <div><a href="{{this}}">{{this}}</a> -- <a href="#" onclick="prompt('', '{{this}}')">Copy to clipboard</a></div>
+        <div><a href="{{this}}">{{this}}</a> -- <a href="#" class="clipboard-copy" data-clipboard-text="{{this}}">Copy to clipboard</a></div>
     {{~/each}}
     </div>
 
     <img src="/static/anime.png" id="anime">
 
+    <script src="/static/clipboard.js"></script>
     <script src="/static/script.js"></script>
 </body>
 </html>

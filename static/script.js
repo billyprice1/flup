@@ -21,3 +21,10 @@ function loadImage(url, callback) {
 		clearTimeout(animeEngineTimer);
 	}
 })();
+
+(function() {
+    if (Clipboard) {
+        var btns = document.querySelectorAll(".clipboard-copy");
+        new Clipboard(btns);
+    }
+})();
