@@ -103,7 +103,7 @@ impl FlupHandler {
 
         let flup_handler_clone = flup_handler.clone();
         router.get("/uploads", move |req: &mut Request| {
-            flup_handler_clone.handle_uploads(req)
+            flup_handler_clone.handle_public_uploads_get(req)
         });
 
         let flup_handler_clone = flup_handler.clone();
@@ -125,6 +125,7 @@ impl FlupHandler {
         mount.mount("/static/", Static::new(Path::new("static")));
 
         let mut chain = Chain::new(mount);
+
         chain.link_after(hbse);
 
         Iron::new(chain).http(flup.config.host.as_str()).unwrap();
@@ -405,7 +406,7 @@ impl FlupHandler {
             _ => None,
         };
 
-        match output_type.unwrap_or("".to_string()).as_str() {
+        match output_type.unwrap_or(String::new()).as_str() {
             "text" => self.handle_upload_text(true, req),
             "gyazo" => self.handle_upload_text(false, req),
             "json" => self.handle_upload_json(req),
@@ -489,8 +490,8 @@ impl FlupHandler {
         Ok(resp)
     }
 
-    pub fn handle_uploads(&self, _: &mut Request) -> IronResult<Response> {
-        let uploads = self.flup.db.get_uploads().unwrap_or(vec![]);
+    pub fn handle_public_uploads_get(&self, _: &mut Request) -> IronResult<Response> {
+        let uploads = self.flup.db.get_public_uploads().unwrap_or(vec![]);
 
         let data = UploadsPageData {
             uploads: uploads,

@@ -48,9 +48,16 @@ impl FlupDb {
         })
     }
 
+    pub fn new_id_seed(&self) -> redis::RedisResult<usize> {
+        let redis = self.redis.get().unwrap();
+
+        Ok(try!(redis.incr(self.key_prefix.clone() + "::idseed", 1)))
+    }
+
     pub fn add_file(&self, file_id: String, file: FileInfo, public: bool) -> redis::RedisResult<()> {
         let redis = self.redis.get().unwrap();
 
+        try!(redis.hset(self.key_prefix.clone() + "::hashes", file.hash.clone(), file_id.clone()));
         try!(redis.hset(self.key_prefix.clone() + "::files", file_id.clone(), file));
 
         if public == true {
@@ -60,22 +67,25 @@ impl FlupDb {
         Ok(())
     }
 
-    pub fn get_file(&self, file_id: String) -> redis::RedisResult<FileInfo> {
+    pub fn get_file_id_by_hash(&self, hash: String) -> redis::RedisResult<String> {
         let redis = self.redis.get().unwrap();
 
-        match redis.hget(self.key_prefix.clone() + "::files", file_id) {
-            Ok(files) => Ok(files),
-            Err(error) => Err(error),
-        }
+        Ok(try!(redis.hget(self.key_prefix.clone() + "::hashes", hash)))
     }
 
-    pub fn get_uploads(&self) -> redis::RedisResult<Vec<FileInfo>> {
+    pub fn get_file_by_id(&self, file_id: String) -> redis::RedisResult<FileInfo> {
+        let redis = self.redis.get().unwrap();
+
+        Ok(try!(redis.hget(self.key_prefix.clone() + "::files", file_id)))
+    }
+
+    pub fn get_public_uploads(&self) -> redis::RedisResult<Vec<FileInfo>> {
         let redis = self.redis.get().unwrap();
 
         let public_ids: Vec<String> = try!(redis.lrange(self.key_prefix.clone() + "::publicfiles", 0, 20));
 
         Ok(public_ids.into_iter().map(|key: String| {
-            self.get_file(key).unwrap()
+            self.get_file_by_id(key).unwrap()
         }).collect())
     }
 
