@@ -22,9 +22,17 @@ function loadImage(url, callback) {
 	}
 })();
 
-(function() {
-    if (Clipboard) {
+function uploadPage() {
+    (function() {
+        Array.prototype.forEach.call(document.querySelectorAll(".upload"), (upload) => {
+            var url = upload.querySelector("a").innerHTML;
+
+            upload.innerHTML += `-- <a href="#" class="clipboard-copy" data-clipboard-text="${url}">Copy to clipboard</a>`;
+        });
+    })();
+
+    (function() {
         var btns = document.querySelectorAll(".clipboard-copy");
         new Clipboard(btns);
-    }
-})();
+    })();
+}
