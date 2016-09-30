@@ -124,6 +124,7 @@ pub enum StartError {
 pub struct UploadRequestParams {
     pub files: Vec<(Option<File>, Option<String>)>,
 
+    pub secure_id: bool,
     pub is_public: bool,
     pub no_filename: bool,
     pub desc: Option<String>,
@@ -251,7 +252,10 @@ impl Flup {
                     self.db.get_file_by_id(file_id.to_string()).unwrap()
                 },
                 Err(_) => {
-                    let file_id = self.new_file_id();
+                    let file_id = match params.secure_id {
+                        true => hash.chars().take(10).collect(),
+                        false => self.new_file_id(),
+                    };
 
                     if let Err(_) = self.fs.write_file(file_id.clone(), file_data.clone()) {
                         return Err(UploadError::WriteFile);

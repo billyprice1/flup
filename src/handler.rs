@@ -175,6 +175,11 @@ impl FlupHandler {
                     _ => {  },
                 }
 
+                let secure_id = match params.get("secureid") {
+                    Some(&Value::String(ref toggle)) if toggle == "on" => true,
+                    _ => false,
+                };
+
                 let desc = match params.get("desc") {
                     Some(&Value::String(ref desc)) => Some(desc.clone()),
                     _ => None,
@@ -193,6 +198,7 @@ impl FlupHandler {
                 Some(UploadRequestParams {
                     files: files,
 
+                    secure_id: secure_id,
                     is_public: is_public,
                     no_filename: no_filename,
                     desc: desc,
