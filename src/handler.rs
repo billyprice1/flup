@@ -190,7 +190,7 @@ impl FlupHandler {
                     _ => false,
                 };
 
-                let is_public = match params.get("public") {
+                let is_private = match params.get("private") {
                     Some(&Value::String(ref toggle)) if toggle == "on" => true,
                     _ => false,
                 };
@@ -198,7 +198,7 @@ impl FlupHandler {
                 Some(UploadRequestParams {
                     files: files,
 
-                    is_public: is_public,
+                    is_private: is_private,
                     no_filename: no_filename,
                     desc: desc,
                 })
