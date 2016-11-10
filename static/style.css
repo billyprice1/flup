@@ -95,7 +95,8 @@ label.checkbox-wrapper {
 }
 
 #anime:hover {
-    filter: brightness(1.2);
+    -webkit-filter: brightness(120%);
+    filter: brightness(120%);
 }
 
 #upload {
