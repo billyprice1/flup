@@ -253,8 +253,8 @@ impl Flup {
                 },
                 Err(_) => {
                     let file_id = match params.is_public {
-                        true => hash.chars().take(10).collect(),
-                        false => self.new_file_id(),
+                        true => self.new_file_id(),
+                        false => hash.chars().take(10).collect(),
                     };
 
                     if let Err(_) = self.fs.write_file(file_id.clone(), file_data.clone()) {
