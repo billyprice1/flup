@@ -16,14 +16,23 @@ Currently is compliant to the Pomf API standard, minus CSV, who the fuck uses CS
 
 It's toml, learn how to use toml, why should I have to tell you how to use shit? What is this a fucking README file? Fuck you. You don't even need to, just edit the default you eejit.
 
-### Host
-key: `host`
+### URL
+key: `url`
 
-The URL which the instance is running on.
+The URL which the instance is running on, used to generate file URLs.
 #### Examples
 >"https://lainfile.pw"
 
 >"http://localhost:8080"
+
+### Host
+key: `host`
+
+The IP and port for the webserver to bind to.
+#### Examples
+>"0.0.0.0:80"
+
+>"127.0.0.1:8080"
 
 ### IP hashing salt
 key: `salt`
