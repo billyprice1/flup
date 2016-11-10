@@ -1,8 +1,9 @@
-#![feature(custom_derive, plugin)]
+#![feature(custom_derive, plugin, proc_macro)]
 #![plugin(tojson_macros)]
 
 #[macro_use] extern crate guard;
 extern crate rustc_serialize;
+#[macro_use] extern crate tojson_macros;
 extern crate toml;
 extern crate crypto;
 

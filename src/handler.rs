@@ -84,37 +84,37 @@ impl FlupHandler {
         let flup_handler_clone = flup_handler.clone();
         router.post("/", move |req: &mut Request| {
             flup_handler_clone.handle_upload(req)
-        });
+        }, "upload");
 
         let flup_handler_clone = flup_handler.clone();
         router.post("/upload.php", move |req: &mut Request| { // legacy
             flup_handler_clone.handle_upload(req)
-        });
+        }, "legacy_upload");
 
         let flup_handler_clone = flup_handler.clone();
         router.get("/:id", move |req: &mut Request| {
             flup_handler_clone.handle_file_by_id(req)
-        });
+        }, "id_request");
 
         let flup_handler_clone = flup_handler.clone();
         router.get("/:id/:name", move |req: &mut Request| {
             flup_handler_clone.handle_file(req)
-        });
+        }, "file_request");
 
         let flup_handler_clone = flup_handler.clone();
         router.get("/uploads", move |req: &mut Request| {
             flup_handler_clone.handle_public_uploads_get(req)
-        });
+        }, "public_uploads_page_request");
 
         let flup_handler_clone = flup_handler.clone();
         router.get("/about", move |req: &mut Request| {
             flup_handler_clone.handle_about(req)
-        });
+        }, "about_page_request");
 
         let flup_handler_clone = flup_handler.clone();
         router.get("/", move |req: &mut Request| {
             flup_handler_clone.handle_home(req)
-        });
+        }, "home_page_request");
 
         let mut hbse = HandlebarsEngine::new();
         hbse.add(Box::new(DirectorySource::new("./views/", ".hbs")));
@@ -167,7 +167,7 @@ impl FlupHandler {
                     Some(&Value::Array(ref file_values)) => {
                         for value in file_values {
                             if let &Value::File(ref file) = value {
-                                let filename = file.filename().and_then(|x| Some(x.to_string()));
+                                let filename = file.filename.clone();
                                 files.push((file.open().ok(), filename))
                             }
                         }
