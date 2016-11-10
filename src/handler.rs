@@ -414,8 +414,8 @@ impl FlupHandler {
         match output_type.unwrap_or(String::new()).as_str() {
             "text" => self.handle_upload_text(true, req),
             "gyazo" => self.handle_upload_text(false, req),
-            "json" => self.handle_upload_json(req),
-            _ => self.handle_upload_html(req),
+            "html" => self.handle_upload_html(req),
+            _ => self.handle_upload_json(req),
         }
     }
 
