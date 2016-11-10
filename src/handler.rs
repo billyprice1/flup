@@ -112,6 +112,11 @@ impl FlupHandler {
         }, "about_page_request");
 
         let flup_handler_clone = flup_handler.clone();
+        router.get("/deletion_log", move |req: &mut Request| {
+            flup_handler_clone.handle_deletion_log(req)
+        }, "deletion_log_page_request");
+
+        let flup_handler_clone = flup_handler.clone();
         router.get("/", move |req: &mut Request| {
             flup_handler_clone.handle_home(req)
         }, "home_page_request");
@@ -175,11 +180,6 @@ impl FlupHandler {
                     _ => {  },
                 }
 
-                let secure_id = match params.get("secureid") {
-                    Some(&Value::String(ref toggle)) if toggle == "on" => true,
-                    _ => false,
-                };
-
                 let desc = match params.get("desc") {
                     Some(&Value::String(ref desc)) => Some(desc.clone()),
                     _ => None,
@@ -198,7 +198,6 @@ impl FlupHandler {
                 Some(UploadRequestParams {
                     files: files,
 
-                    secure_id: secure_id,
                     is_public: is_public,
                     no_filename: no_filename,
                     desc: desc,
@@ -512,5 +511,11 @@ impl FlupHandler {
         let mut resp = Response::new();
         resp.set_mut(Template::new("about", ())).set_mut(Status::Ok);
         Ok(resp)
+    }
+
+    pub fn handle_deletion_log(&self, _: &mut Request) -> IronResult<Response> {
+        let deletion_log = self.flup.db.get_deletion_log().unwrap_or(vec![]);
+
+       Ok(Response::with((Status::Ok, deletion_log.join("\n"))))
     }
 }

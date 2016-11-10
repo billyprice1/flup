@@ -100,4 +100,10 @@ impl FlupDb {
 
         Ok(try!(redis.llen(self.key_prefix.clone() + "::publicfiles")))
     }
+
+    pub fn get_deletion_log(&self) -> redis::RedisResult<Vec<String>> {
+        let redis = self.redis.get().unwrap();
+
+        Ok(try!(redis.llen(self.key_prefix.clone() + "::deletionlog")))
+    }
 }

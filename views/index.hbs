@@ -42,19 +42,13 @@
             <br>
             <br>
 
-            <label class="no-highlight" for="secureid-toggle">Use hash-based (hard to guess) ID:</label>
-            <input type="checkbox" name="secureid" id="secureid-toggle">
-            <label for="secureid-toggle" class="no-highlight checkbox-wrapper"></label>
-
-            <br>
-
-            <label class="no-highlight" for="public-toggle">Show on public list:</label>
+            <label class="no-highlight" for="public-toggle">Long URL and hide from list:</label>
             <input type="checkbox" name="public" id="public-toggle">
             <label for="public-toggle" class="no-highlight checkbox-wrapper"></label>
 
             <br>
 
-            <label class="no-highlight" for="nofilename-toggle">Hide upload's filename:</label>
+            <label class="no-highlight" for="nofilename-toggle">Hide upload's original filename:</label>
             <input type="checkbox" name="nofilename" id="nofilename-toggle">
             <label for="nofilename-toggle" class="no-highlight checkbox-wrapper"></label>
         </div>
@@ -70,7 +64,7 @@
 
     <img src="/static/anime.png" id="anime">
 
-    <footer>There are currently {{ uploads_count }} uploads, and {{ public_uploads_count }} <a href="uploads">public uploads</a>!</footer>
+    <footer>{{ uploads_count }} total uploads - {{ public_uploads_count }} <a href="uploads">public uploads</a>!</footer>
 
     <script src="/static/script.js"></script>
 </body>
