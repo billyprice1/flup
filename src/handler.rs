@@ -133,7 +133,7 @@ impl FlupHandler {
 
         chain.link_after(hbse);
 
-        Iron::new(chain).http(flup.config.host.as_str()).unwrap();
+        Iron::new(chain).http(flup.config.host.as_str()).expect("Unable to start webserver");
     }
 
     fn error_page(&self, status: Status, text: &str) -> IronResult<Response> {

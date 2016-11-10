@@ -9,7 +9,7 @@ extern crate crypto;
 
 use rustc_serialize::Decodable;
 
-use std::io::{self, Read};
+use std::io::Read;
 use std::fs::File;
 use std::path::Path;
 
@@ -73,11 +73,11 @@ fn blocked_extension(blocked: &[String], filename: &String) -> bool {
     }
 }
 
-fn handle_xforwarded(ips_string: String, i: usize) -> String {
+fn handle_xforwarded(ips_string: String, i: usize) -> Option<String> {
     let mut ips: Vec<&str> = ips_string.split(", ").collect();
     ips.reverse();
 
-    ips.get(i).unwrap().to_string()
+    ips.get(i).map(|ip| ip.to_string())
 }
 
 #[derive(Debug, Clone, RustcDecodable)]
@@ -118,8 +118,7 @@ pub struct Flup {
 
 #[derive(Debug)]
 pub enum StartError {
-    Redis(db::RedisError),
-    Io(io::Error),
+    Db(db::StartError),
 }
 
 pub struct UploadRequestParams {
@@ -175,7 +174,11 @@ pub enum IdGetError {
 
 impl Flup {
     pub fn new(config: FlupConfig) -> Result<Flup, StartError> {
-        let db = try!(FlupDb::new(config.redis_prefix.clone()));
+        let db = match FlupDb::new(config.redis_prefix.clone()) {
+            Err(error) => return Err(StartError::Db(error)),
+            Ok(db) => db,
+        };
+
         let fs = FlupFs::new();
 
         Ok(Flup {
@@ -207,7 +210,7 @@ impl Flup {
 
         let ip = match req.xforwarded {
             Some(ref ips_string) if self.config.xforwarded == true => {
-                handle_xforwarded(ips_string.clone(), self.config.xforwarded_index)
+                handle_xforwarded(ips_string.clone(), self.config.xforwarded_index).expect("Invalid xforwarded index, change your config?")
             },
             _ => req.ip,
         };
@@ -335,7 +338,11 @@ fn get_config() -> FlupConfig {
 
 fn main() {
     let config = get_config();
-    let flup = Flup::new(config.clone()).unwrap();
+
+    let flup = match Flup::new(config.clone()) {
+        Err(error) => panic!("Error starting: {:?}", error),
+        Ok(flup) => flup,
+    };
 
     FlupHandler::start(flup);
 }

@@ -2,16 +2,20 @@ extern crate r2d2;
 extern crate r2d2_redis;
 extern crate redis;
 
-use super::{StartError, FileInfo};
+use super::FileInfo;
 
 use rustc_serialize::json;
 
 use self::redis::{Commands, ToRedisArgs, FromRedisValue};
-pub use self::redis::RedisError;
-
 use self::r2d2_redis::RedisConnectionManager;
 
 use std::default::Default;
+
+#[derive(Debug)]
+pub enum StartError {
+    RedisError(redis::RedisError),
+    Pool(r2d2::InitializationError),
+}
 
 #[derive(Clone)]
 pub struct FlupDb {
@@ -34,13 +38,16 @@ impl FromRedisValue for FileInfo {
 impl FlupDb {
     pub fn new(key_prefix: String) -> Result<FlupDb, StartError> {
         let manager = match RedisConnectionManager::new("redis://127.0.0.1/") {
-            Err(error) => return Err(StartError::Redis(error)),
+            Err(error) => return Err(StartError::RedisError(error)),
             Ok(manager) => manager,
         };
 
         let config = Default::default();
 
-        let pool = r2d2::Pool::new(config, manager).unwrap();
+        let pool = match r2d2::Pool::new(config, manager) {
+            Err(error) => return Err(StartError::Pool(error)),
+            Ok(pool) => pool,
+        };
 
         Ok(FlupDb {
             redis: pool,
