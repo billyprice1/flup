@@ -109,6 +109,12 @@ pub struct FileInfo {
     pub uploader: String,
 }
 
+#[derive(Debug, Clone, ToJson, RustcEncodable, RustcDecodable)]
+pub struct DeletedFile {
+    pub file: FileInfo,
+    pub reason: String,
+}
+
 #[derive(Clone)]
 pub struct Flup {
     config: FlupConfig,

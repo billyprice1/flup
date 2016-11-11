@@ -2,7 +2,7 @@ extern crate r2d2;
 extern crate r2d2_redis;
 extern crate redis;
 
-use super::FileInfo;
+use super::{FileInfo, DeletedFile};
 
 use rustc_serialize::json;
 
@@ -30,6 +30,18 @@ impl ToRedisArgs for FileInfo {
 }
 
 impl FromRedisValue for FileInfo {
+    fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
+        Ok(json::decode(try!(String::from_redis_value(v)).as_str()).unwrap())
+    }
+}
+
+impl ToRedisArgs for DeletedFile {
+    fn to_redis_args(&self) -> Vec<Vec<u8>> {
+        json::encode(self).unwrap().to_redis_args()
+    }
+}
+
+impl FromRedisValue for DeletedFile {
     fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
         Ok(json::decode(try!(String::from_redis_value(v)).as_str()).unwrap())
     }
@@ -108,7 +120,7 @@ impl FlupDb {
         Ok(try!(redis.llen(self.key_prefix.clone() + "::publicfiles")))
     }
 
-    pub fn get_deletion_log(&self) -> redis::RedisResult<Vec<String>> {
+    pub fn get_deleted_files(&self) -> redis::RedisResult<Vec<DeletedFile>> {
         let redis = self.redis.get().unwrap();
 
         Ok(try!(redis.lrange(self.key_prefix.clone() + "::deletionlog", 0, -1)))

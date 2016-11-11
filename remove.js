@@ -52,6 +52,8 @@ let toml = require("toml")
 				console.error("Error parsing fileInfo JSON", err)
 			}
 
+			let hash = fileInfo["hash"]
+
 			redisClient.lrem(`${redisPrefix}::publicfiles`, 1, fileId, (err) => {
 				if (err) {
 					redisClient.quit()
@@ -61,7 +63,7 @@ let toml = require("toml")
 
 				console.log("Removed from publicfiles...")
 
-				redisClient.hdel(`${redisPrefix}::hashes`, fileInfo.hash, (err) => {
+				redisClient.hdel(`${redisPrefix}::hashes`, fileInfo["hash"], (err) => {
 					if (err) {
 						redisClient.quit()
 						console.error("Error removing from HASH->ID map", err)
@@ -80,7 +82,12 @@ let toml = require("toml")
 						console.log("Removed from fileInfo map...")
 
 						if (reason != undefined) {
-							redisClient.rpush(`${redisPrefix}::deletionlog`, `${url}/${fileId} -- ${reason}`, (err) => {
+							let deletedFile = {
+								reason: reason,
+								file: fileInfo,
+							}
+
+							redisClient.rpush(`${redisPrefix}::deletionlog`, JSON.stringify(deletedFile), (err) => {
 								if (err) {
 									redisClient.quit()
 									console.error("Error pushing to deletion log", err)

@@ -1,4 +1,15 @@
-use super::*;
+use super::{
+    Flup,
+    FileInfo,
+    DeletedFile,
+    UploadRequest,
+    UploadRequestParams,
+    UploadError,
+    IdGetRequest,
+    IdGetError,
+    GetRequest,
+    GetError,
+};
 
 extern crate mime_guess;
 extern crate handlebars_iron as hbs;
@@ -61,6 +72,11 @@ struct UploadedPageData {
 #[derive(ToJson)]
 struct UploadsPageData {
     uploads: Vec<FileInfo>,
+}
+
+#[derive(ToJson)]
+struct DeletedFilesData {
+    deleted_files: Vec<DeletedFile>,
 }
 
 #[derive(ToJson)]
@@ -514,8 +530,14 @@ impl FlupHandler {
     }
 
     pub fn handle_deletion_log(&self, _: &mut Request) -> IronResult<Response> {
-        let deletion_log = self.flup.db.get_deletion_log().unwrap_or(vec![]);
+        let deleted_files = self.flup.db.get_deleted_files().unwrap_or(vec![]);
 
-       Ok(Response::with((Status::Ok, deletion_log.join("\n"))))
+        let data = DeletedFilesData {
+            deleted_files: deleted_files,
+        };
+
+        let mut resp = Response::new();
+        resp.set_mut(Template::new("deletedfiles", data)).set_mut(Status::Ok);
+        Ok(resp)
     }
 }

@@ -2,7 +2,7 @@
 
 <html>
 <head>
-    <title>Lainfile - Uploads</title>
+    <title>Lainfile - Deleted files</title>
     <meta name=viewport content="width=device-width, initial-scale=1">
 
     <link rel="stylesheet" href="/static/style.css">
@@ -30,17 +30,20 @@
 </head>
 
 <body>
-    <h1>Uploads</h1>
-    <p>List of all public uploads, uploads being shown on this list is optional, but recomended, as they otherwise may not be archived for privacy reasons.</p>
+    <h1>Deleted files</h1>
+    <p>Here is a full list of every file deleted from Lainfile and it's reason for being removed.</p>
 
     <hr>
 
     <div>
-        {{#each uploads}}
+        {{#each deleted_files}}
         <div class="box">
-            <div>ID: <a href="/{{file_id}}">{{file_id}}</a></div>
-            <div>Name: <span class="break">{{name}}</span></div>
-            {{#if desc}}<div>Desc: <span class="break">{{desc}}</span></div>{{/if}}
+            <div>ID: <a href="/{{file_id}}">{{file.file_id}}</a></div>
+            <div>Deletion reason: <span class="break">{{reason}}</span></div>
+            <br>
+            <div>Name: <span class="break">{{file.name}}</span></div>
+            <div>Hash: <span class="break">{{file.hash}}</span></div>
+            {{#if file.desc}}<div>Desc: <span class="break">{{file.desc}}</span></div>{{/if}}
         </div>
         <br>
         {{~/each}}
