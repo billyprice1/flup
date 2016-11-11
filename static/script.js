@@ -27,7 +27,7 @@ function uploadPage() {
         Array.prototype.forEach.call(document.querySelectorAll(".upload"), (upload) => {
             var url = upload.querySelector("a").innerHTML;
 
-            upload.innerHTML += `-- <a href="#" class="clipboard-copy" data-clipboard-text="${url}">Copy to clipboard</a>`;
+            upload.innerHTML += ` -- <a href="#" class="clipboard-copy" data-clipboard-text="${url}">Copy to clipboard</a>`;
         });
     })();
 

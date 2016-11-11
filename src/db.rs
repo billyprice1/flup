@@ -92,7 +92,7 @@ impl FlupDb {
         let public_ids: Vec<String> = try!(redis.lrange(self.key_prefix.clone() + "::publicfiles", 0, 20));
 
         Ok(public_ids.into_iter().map(|key: String| {
-            self.get_file_by_id(key).unwrap()
+            self.get_file_by_id(key).expect("File in publicfiles missing") // TODO: handle this error
         }).collect())
     }
 
@@ -111,6 +111,6 @@ impl FlupDb {
     pub fn get_deletion_log(&self) -> redis::RedisResult<Vec<String>> {
         let redis = self.redis.get().unwrap();
 
-        Ok(try!(redis.llen(self.key_prefix.clone() + "::deletionlog")))
+        Ok(try!(redis.lrange(self.key_prefix.clone() + "::deletionlog", 0, -1)))
     }
 }
