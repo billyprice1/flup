@@ -252,7 +252,7 @@ impl Flup {
 
             let file_info = match self.db.get_file_id_by_hash(hash.clone()) {
                 Ok(file_id) => {
-                    self.db.get_file_by_id(file_id.to_string()).unwrap()
+                    self.db.get_file_by_id(file_id.to_string()).expect("File with identical hash missing")
                 },
                 Err(_) => {
                     let file_id = match params.is_private {
@@ -327,13 +327,13 @@ impl Flup {
 }
 
 fn get_config() -> FlupConfig {
-    let mut f = File::open("config.toml").unwrap();
+    let mut f = File::open("config.toml").expect("Config file missing");
     let mut data = String::new();
-    f.read_to_string(&mut data).unwrap();
+    f.read_to_string(&mut data).expect("Unable to read config file");
 
-    let v = toml::Parser::new(&data).parse().unwrap();
+    let v = toml::Parser::new(&data).parse().expect("Error parsing config");
     let mut d = toml::Decoder::new(toml::Value::Table(v));
-    FlupConfig::decode(&mut d).unwrap()
+    FlupConfig::decode(&mut d).expect("Error creating FlupConfig from config")
 }
 
 fn main() {
