@@ -324,6 +324,34 @@ impl Flup {
 
         Ok(file_info)
     }
+
+    pub fn uploads_count(&self) -> Result<(isize, isize), ()> {
+        let uploads_count = match self.db.get_uploads_count() {
+            Ok(count) => count,
+            Err(_) => return Err(())
+        };
+
+        let public_uploads_count = match self.db.get_public_uploads_count() {
+            Ok(count) => count,
+            Err(_) => return Err(())
+        };
+
+        Ok((uploads_count, public_uploads_count))
+    }
+
+    pub fn public_uploads(&self) -> Result<Vec<FileInfo>, ()> {
+        match self.db.get_public_uploads() {
+            Ok(files) => Ok(files.into_iter().take(50).collect()),
+            Err(_) => Err(()),
+        }
+    }
+
+    pub fn deletion_log(&self) -> Result<Vec<DeletedFile>, ()> {
+        match self.db.get_deleted_files() {
+            Ok(deleted_files) => Ok(deleted_files),
+            Err(_) => Err(()),
+        }
+    }
 }
 
 fn get_config() -> FlupConfig {

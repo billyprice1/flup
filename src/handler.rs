@@ -470,8 +470,7 @@ impl FlupHandler {
     }
 
     pub fn handle_home(&self, _: &mut Request) -> IronResult<Response> {
-        let uploads_count = self.flup.db.get_uploads_count().unwrap_or(0);
-        let public_uploads_count = self.flup.db.get_public_uploads_count().unwrap_or(0);
+        let (uploads_count, public_uploads_count) = self.flup.uploads_count().unwrap_or((0, 0));
 
         let data = HomePageData {
             uploads_count: uploads_count,
@@ -484,7 +483,7 @@ impl FlupHandler {
     }
 
     pub fn handle_public_uploads_get(&self, _: &mut Request) -> IronResult<Response> {
-        let uploads = self.flup.db.get_public_uploads().unwrap_or(vec![]).into_iter().take(50).collect();
+        let uploads = self.flup.public_uploads().unwrap_or(vec![]);
 
         let data = UploadsPageData {
             uploads: uploads,
@@ -502,7 +501,7 @@ impl FlupHandler {
     }
 
     pub fn handle_deletion_log(&self, _: &mut Request) -> IronResult<Response> {
-        let deleted_files = self.flup.db.get_deleted_files().unwrap_or(vec![]);
+        let deleted_files = self.flup.deletion_log().unwrap_or(vec![]);
 
         let data = DeletedFilesData {
             deleted_files: deleted_files,
