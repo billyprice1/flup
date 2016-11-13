@@ -35,7 +35,23 @@ use self::mount::Mount;
 
 use self::hbs::{Template, HandlebarsEngine, DirectorySource};
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+enum UploadErrorType {
+    ServerError,
+    UserError,
+    Denied,
+}
+
+enum IdGetErrorType {
+    NotFound,
+}
+
+enum GetErrorType {
+    ServerError,
+    Denied,
+    NotFound,
+}
 
 #[derive(RustcEncodable)]
 struct JsonFile {
@@ -89,6 +105,38 @@ pub struct FlupHandler {
     flup: Flup,
 }
 
+fn error_info_from_upload_error(error: &UploadError) -> (UploadErrorType, &str) {
+    match error {
+        &UploadError::SetIp => (UploadErrorType::ServerError, "Error adding IP to temp DB"),
+        &UploadError::NoPostParams => (UploadErrorType::UserError, "No POST params found"),
+        &UploadError::InvalidFileData => (UploadErrorType::UserError, "Invalid file data found"),
+        &UploadError::FileEmpty => (UploadErrorType::UserError, "Specified file is empty"),
+        &UploadError::FileTooBig => (UploadErrorType::UserError, "File exceeds our limit"),
+        &UploadError::OpenUploadFile => (UploadErrorType::ServerError, "Error opening uploaded file"),
+        &UploadError::GetMetadata => (UploadErrorType::ServerError, "Unable to get file metadata"),
+        &UploadError::ReadData => (UploadErrorType::ServerError, "Error reading file data"),
+        &UploadError::CreateFile => (UploadErrorType::ServerError, "Error creating file"),
+        &UploadError::WriteFile => (UploadErrorType::ServerError, "Error writing to file"),
+        &UploadError::BlockedExtension => (UploadErrorType::Denied, "Uploading files with this extension is not allowed."),
+        &UploadError::DescTooLong => (UploadErrorType::UserError, "Description too long"),
+        &UploadError::AddFile => (UploadErrorType::ServerError, "Error adding file to DB"),
+    }
+}
+
+fn error_info_from_get_error(error: &GetError) -> (GetErrorType, &str) {
+    match error {
+        &GetError::NotFound => (GetErrorType::NotFound, "File not found"),
+        &GetError::BlockedExtension => (GetErrorType::Denied, "Fetching this extension is not allowed, try changing the filename in the url :^)"),
+        &GetError::FileNotFound => (GetErrorType::ServerError, "File not found (on disk (oh fuck))"),
+    }
+}
+
+fn error_info_from_id_get_error(error: &IdGetError) -> (IdGetErrorType, &str) {
+    match error {
+        &IdGetError::NotFound => (IdGetErrorType::NotFound, "File not found"),
+    }
+}
+
 impl FlupHandler {
     pub fn start(flup: Flup) {
         let mut router = Router::new();
@@ -139,7 +187,7 @@ impl FlupHandler {
 
         let mut hbse = HandlebarsEngine::new();
         hbse.add(Box::new(DirectorySource::new("./views/", ".hbs")));
-        hbse.reload().unwrap();
+        hbse.reload().expect("Error reloading handlebars engine");
 
         let mut mount = Mount::new();
         mount.mount("/", router);
@@ -163,11 +211,13 @@ impl FlupHandler {
     }
 
     fn json_error(&self, error_code: usize, text: &str) -> IronResult<Response> {
-        let json = json::encode(&ErrorJsonResponse {
+        let response = ErrorJsonResponse {
             success: false,
             errorcode: error_code,
             description: text,
-        }).unwrap();
+        };
+        
+        let json = json::encode(&response).expect("Error creating JSON from error struct");
 
         Ok(Response::with((Status::Ok, json)))
     }
@@ -249,44 +299,15 @@ impl FlupHandler {
                 Ok(resp)
             },
             Err(error) => {
-                match error {
-                    UploadError::SetIp => {
-                        self.error_page(Status::InternalServerError, "Error adding IP to temp DB")
-                    },
-                    UploadError::NoPostParams => {
-                        self.error_page(Status::BadRequest, "No POST params found")
-                    },
-                    UploadError::InvalidFileData => {
-                        self.error_page(Status::BadRequest, "Invalid file data found")
-                    },
-                    UploadError::FileEmpty => {
-                        self.error_page(Status::BadRequest, "Specified file is empty")
-                    },
-                    UploadError::FileTooBig => {
-                        self.error_page(Status::BadRequest, "File exceeds our limit")
-                    },
-                    UploadError::OpenUploadFile => {
-                        self.error_page(Status::InternalServerError, "Error opening uploaded file")
-                    },
-                    UploadError::GetMetadata => {
-                        self.error_page(Status::InternalServerError, "Unable to get file metadata")
-                    },
-                    UploadError::ReadData => {
-                        self.error_page(Status::InternalServerError, "Error reading file data")
-                    },
-                    UploadError::WriteFile => {
-                        self.error_page(Status::InternalServerError, "Error writing to file")
-                    },
-                    UploadError::BlockedExtension => {
-                        self.error_page(Status::BadRequest, "Uploading files with this extension is not allowed.")
-                    },
-                    UploadError::DescTooLong => {
-                        self.error_page(Status::BadRequest, "Description too long")
-                    },
-                    UploadError::AddFile => {
-                        self.error_page(Status::InternalServerError, "Error adding file to DB")
-                    },
-                }
+                let (error_type, error_text) = error_info_from_upload_error(&error);
+
+                let status = match error_type {
+                    UploadErrorType::ServerError => Status::InternalServerError,
+                    UploadErrorType::UserError => Status::BadRequest,
+                    UploadErrorType::Denied => Status::Forbidden,
+                };
+
+                self.error_page(status, error_text)
             },
         }
     }
@@ -308,44 +329,15 @@ impl FlupHandler {
                 Ok(Response::with((Status::Ok, urls_string)))
             },
             Err(error) => {
-                match error {
-                    UploadError::SetIp => {
-                        Ok(Response::with((Status::InternalServerError, "Error adding IP to temp DB")))
-                    },
-                    UploadError::NoPostParams => {
-                        Ok(Response::with((Status::BadRequest, "No POST params found")))
-                    },
-                    UploadError::InvalidFileData => {
-                        Ok(Response::with((Status::BadRequest, "Invalid file data found")))
-                    },
-                    UploadError::FileEmpty => {
-                        Ok(Response::with((Status::BadRequest, "Specified file is empty")))
-                    },
-                    UploadError::FileTooBig => {
-                        Ok(Response::with((Status::BadRequest, "File exceeds our limit")))
-                    },
-                    UploadError::OpenUploadFile => {
-                        Ok(Response::with((Status::InternalServerError, "Error opening uploaded file")))
-                    },
-                    UploadError::GetMetadata => {
-                        Ok(Response::with((Status::InternalServerError, "Unable to get file metadata")))
-                    },
-                    UploadError::ReadData => {
-                        Ok(Response::with((Status::InternalServerError, "Error reading file data")))
-                    },
-                    UploadError::WriteFile => {
-                        Ok(Response::with((Status::InternalServerError, "Error writing to file")))
-                    },
-                    UploadError::BlockedExtension => {
-                        Ok(Response::with((Status::BadRequest, "Uploading files with this extension is not allowed.")))
-                    },
-                    UploadError::DescTooLong => {
-                        Ok(Response::with((Status::BadRequest, "Description too long")))
-                    },
-                    UploadError::AddFile => {
-                        Ok(Response::with((Status::InternalServerError, "Error adding file to DB")))
-                    },
-                }
+                let (error_type, error_text) = error_info_from_upload_error(&error);
+
+                let status = match error_type {
+                    UploadErrorType::ServerError => Status::InternalServerError,
+                    UploadErrorType::UserError => Status::BadRequest,
+                    UploadErrorType::Denied => Status::Forbidden,
+                };
+
+                Ok(Response::with((status, error_text)))
             },
         }
     }
@@ -371,47 +363,20 @@ impl FlupHandler {
                     files: json_files,
                 };
 
-                Ok(Response::with((Status::Ok, json::encode(&response).unwrap())))
+                let json = json::encode(&response).unwrap();
+
+                Ok(Response::with((Status::Ok, json)))
             },
             Err(error) => {
-                match error {
-                    UploadError::SetIp => {
-                        self.json_error(500, "Error adding IP to temp DB")
-                    },
-                    UploadError::NoPostParams => {
-                        self.json_error(400, "No POST params found")
-                    },
-                    UploadError::InvalidFileData => {
-                        self.json_error(400, "Invalid file data found")
-                    },
-                    UploadError::FileEmpty => {
-                        self.json_error(400, "Specified file is empty")
-                    },
-                    UploadError::FileTooBig => {
-                        self.json_error(400, "File exceeds our limit")
-                    },
-                    UploadError::OpenUploadFile => {
-                        self.json_error(500, "Error opening uploaded file")
-                    },
-                    UploadError::GetMetadata => {
-                        self.json_error(500, "Unable to get file metadata")
-                    },
-                    UploadError::ReadData => {
-                        self.json_error(500, "Error reading file data")
-                    },
-                    UploadError::WriteFile => {
-                        self.json_error(500, "Error writing to file")
-                    },
-                    UploadError::BlockedExtension => {
-                        self.json_error(403, "Uploading files with this extension is not allowed.")
-                    },
-                    UploadError::DescTooLong => {
-                        self.json_error(400, "Description too long")
-                    },
-                    UploadError::AddFile => {
-                        self.json_error(500, "Error adding file to DB")
-                    },
-                }
+                let (error_type, error_text) = error_info_from_upload_error(&error);
+
+                let code = match error_type {
+                    UploadErrorType::ServerError => 500,
+                    UploadErrorType::UserError => 400,
+                    UploadErrorType::Denied => 403,
+                };
+
+                self.json_error(code, error_text)
             },
         }
     }
@@ -427,10 +392,10 @@ impl FlupHandler {
             _ => None,
         };
 
-        match output_type.unwrap_or(String::new()).as_str() {
-            "text" => self.handle_upload_text(true, req),
-            "gyazo" => self.handle_upload_text(false, req),
-            "html" => self.handle_upload_html(req),
+        match output_type.as_ref().map(String::as_ref) {
+            Some("text") => self.handle_upload_text(true, req),
+            Some("gyazo") => self.handle_upload_text(false, req),
+            Some("html") => self.handle_upload_html(req),
             _ => self.handle_upload_json(req),
         }
     }
@@ -450,14 +415,18 @@ impl FlupHandler {
         match self.flup.file_by_id(flup_req) {
             Ok((file_id, file_info)) => {
                 let url = format!("{}/{}/{}", self.flup.config.url, file_id, file_info.name);
-                Ok(Response::with((Status::SeeOther, Redirect(Url::parse(url.as_str()).unwrap()))))
+                let redirect = Redirect(Url::parse(&url).unwrap());
+
+                Ok(Response::with((Status::SeeOther, redirect)))
             },
             Err(error) => {
-                match error {
-                    IdGetError::NotFound => {
-                        self.error_page(Status::NotFound, "File not found")
-                    }
-                }
+                let (error_type, error_text) = error_info_from_id_get_error(&error);
+
+                let status = match error_type {
+                    IdGetErrorType::NotFound => Status::NotFound,
+                };
+
+                self.error_page(status, error_text)
             },
         }
     }
@@ -477,22 +446,25 @@ impl FlupHandler {
         let flup_req = self.process_file_request(req);
 
         match self.flup.file(flup_req) {
-            Ok((file_info, file_data)) => {
-                let mime = mime_guess::guess_mime_type(Path::new(file_info.name.as_str()));
-                Ok(Response::with((Status::Ok, mime, file_data)))
+            Ok(file_info) => {
+                let flup_req = self.process_file_request(req);
+                let file_path = PathBuf::from(format!("files/{}", &flup_req.file_id));
+
+                let name_path = PathBuf::from(file_info.name);
+                let mime = mime_guess::guess_mime_type(name_path);
+
+                Ok(Response::with((Status::Ok, mime, file_path)))
             },
             Err(error) => {
-                match error {
-                    GetError::NotFound => {
-                        self.error_page(Status::NotFound, "File not found")
-                    },
-                    GetError::BlockedExtension => {
-                        self.error_page(Status::Unauthorized, "Fetching this extension is not allowed, try changing the filename in the url :^)")
-                    },
-                    GetError::FileNotFound => {
-                        self.error_page(Status::NotFound, "File not found (on disk (oh fuck))")
-                    },
-                }
+                let (error_type, error_text) = error_info_from_get_error(&error);
+
+                let status = match error_type {
+                    GetErrorType::ServerError => Status::InternalServerError,
+                    GetErrorType::NotFound => Status::NotFound,
+                    GetErrorType::Denied => Status::Forbidden,
+                };
+
+                self.error_page(status, error_text)
             },
         }
     }

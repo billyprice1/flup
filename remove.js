@@ -63,7 +63,7 @@ let toml = require("toml")
 
 				console.log("Removed from publicfiles...")
 
-				redisClient.hdel(`${redisPrefix}::hashes`, fileInfo["hash"], (err) => {
+				redisClient.hdel(`${redisPrefix}::hashes`, hash, (err) => {
 					if (err) {
 						redisClient.quit()
 						console.error("Error removing from HASH->ID map", err)

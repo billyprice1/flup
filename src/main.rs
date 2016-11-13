@@ -9,18 +9,16 @@ extern crate crypto;
 
 use rustc_serialize::Decodable;
 
-use std::io::Read;
+use std::io::{Read, Write};
 use std::fs::File;
 use std::path::Path;
 
 use crypto::sha1::Sha1;
 use crypto::digest::Digest;
 
-mod file;
 mod db;
 mod handler;
 
-use file::FlupFs;
 use db::FlupDb;
 use handler::FlupHandler;
 
@@ -119,7 +117,6 @@ pub struct DeletedFile {
 pub struct Flup {
     config: FlupConfig,
     db: FlupDb,
-    fs: FlupFs,
 }
 
 #[derive(Debug)]
@@ -160,6 +157,7 @@ pub enum UploadError {
     OpenUploadFile,
     GetMetadata,
     ReadData,
+    CreateFile,
     WriteFile,
     BlockedExtension,
     DescTooLong,
@@ -185,12 +183,9 @@ impl Flup {
             Ok(db) => db,
         };
 
-        let fs = FlupFs::new();
-
         Ok(Flup {
             config: config,
             db: db,
-            fs: fs,
         })
     }
 
@@ -266,16 +261,19 @@ impl Flup {
                         false => self.new_file_id(),
                     };
 
-                    if let Err(_) = self.fs.write_file(file_id.clone(), file_data.clone()) {
-                        return Err(UploadError::WriteFile);
+                    match File::create(format!("files/{}", file_id)) {
+                        Ok(mut file) => {
+                            match file.write_all(&file_data) { 
+                                Err(_) => return Err(UploadError::WriteFile),
+                                _ => {  },
+                            }
+                        },
+                        Err(_) => return Err(UploadError::CreateFile),
                     }
 
-                    let filename = match filename  {
-                        Some(ref filename) if filename.len() != 0 && params.no_filename == false => {
-                            handle_filename(filename.clone(), false)
-                        },
+                    let filename = match filename.as_ref().map(|filename| filename.trim())  {
                         Some(ref filename) if filename.len() != 0 => {
-                            handle_filename(filename.clone(), true)
+                            handle_filename(filename.to_string(), !params.no_filename)
                         },
                         _ => "file".to_string(),
                     };
@@ -315,7 +313,7 @@ impl Flup {
         Ok((req.file_id, file_info))
     }
 
-    pub fn file(&self, req: GetRequest) -> Result<(FileInfo, Vec<u8>), GetError> {
+    pub fn file(&self, req: GetRequest) -> Result<FileInfo, GetError> {
         if blocked_extension(&self.config.no_access_extensions, &req.filename) {
             return Err(GetError::BlockedExtension);
         }
@@ -324,11 +322,7 @@ impl Flup {
             return Err(GetError::NotFound);
         });
 
-        guard!(let Ok(file_data) = self.fs.get_file(req.file_id.clone()) else {
-            return Err(GetError::FileNotFound);
-        });
-
-        Ok((file_info, file_data))
+        Ok(file_info)
     }
 }
 

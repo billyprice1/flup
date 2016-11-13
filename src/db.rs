@@ -67,14 +67,18 @@ impl FlupDb {
         })
     }
 
+    fn get_redis(&self) -> r2d2::PooledConnection<RedisConnectionManager> {
+        self.redis.get().expect("Unable to get redis conn from pool")
+    }
+
     pub fn new_id_seed(&self) -> redis::RedisResult<usize> {
-        let redis = self.redis.get().unwrap();
+        let redis = self.get_redis();
 
         Ok(try!(redis.incr(self.key_prefix.clone() + "::idseed", 1)))
     }
 
     pub fn add_file(&self, file_id: String, file: FileInfo, public: bool) -> redis::RedisResult<()> {
-        let redis = self.redis.get().unwrap();
+        let redis = self.get_redis();
 
         try!(redis.hset(self.key_prefix.clone() + "::hashes", file.hash.clone(), file_id.clone()));
         try!(redis.hset(self.key_prefix.clone() + "::files", file_id.clone(), file));
@@ -87,19 +91,19 @@ impl FlupDb {
     }
 
     pub fn get_file_id_by_hash(&self, hash: String) -> redis::RedisResult<String> {
-        let redis = self.redis.get().unwrap();
+        let redis = self.get_redis();
 
         Ok(try!(redis.hget(self.key_prefix.clone() + "::hashes", hash)))
     }
 
     pub fn get_file_by_id(&self, file_id: String) -> redis::RedisResult<FileInfo> {
-        let redis = self.redis.get().unwrap();
+        let redis = self.get_redis();
 
         Ok(try!(redis.hget(self.key_prefix.clone() + "::files", file_id)))
     }
 
     pub fn get_public_uploads(&self) -> redis::RedisResult<Vec<FileInfo>> {
-        let redis = self.redis.get().unwrap();
+        let redis = self.get_redis();
 
         let public_ids: Vec<String> = try!(redis.lrange(self.key_prefix.clone() + "::publicfiles", 0, 20));
 
@@ -109,19 +113,19 @@ impl FlupDb {
     }
 
     pub fn get_uploads_count(&self) -> redis::RedisResult<isize> {
-        let redis = self.redis.get().unwrap();
+        let redis = self.get_redis();
 
         Ok(try!(redis.hlen(self.key_prefix.clone() + "::files")))
     }
 
     pub fn get_public_uploads_count(&self) -> redis::RedisResult<isize> {
-        let redis = self.redis.get().unwrap();
+        let redis = self.get_redis();
 
         Ok(try!(redis.llen(self.key_prefix.clone() + "::publicfiles")))
     }
 
     pub fn get_deleted_files(&self) -> redis::RedisResult<Vec<DeletedFile>> {
-        let redis = self.redis.get().unwrap();
+        let redis = self.get_redis();
 
         Ok(try!(redis.lrange(self.key_prefix.clone() + "::deletionlog", 0, -1)))
     }
