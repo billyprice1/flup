@@ -105,7 +105,7 @@ impl FlupDb {
     pub fn get_public_uploads(&self) -> redis::RedisResult<Vec<FileInfo>> {
         let redis = self.get_redis();
 
-        let public_ids: Vec<String> = try!(redis.lrange(self.key_prefix.clone() + "::publicfiles", 0, 20));
+        let public_ids: Vec<String> = try!(redis.lrange(self.key_prefix.clone() + "::publicfiles", 0, -1));
 
         Ok(public_ids.into_iter().map(|key: String| {
             self.get_file_by_id(key).expect("File in publicfiles missing") // TODO: handle this error

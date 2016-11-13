@@ -484,7 +484,7 @@ impl FlupHandler {
     }
 
     pub fn handle_public_uploads_get(&self, _: &mut Request) -> IronResult<Response> {
-        let uploads = self.flup.db.get_public_uploads().unwrap_or(vec![]);
+        let uploads = self.flup.db.get_public_uploads().unwrap_or(vec![]).into_iter().take(50).collect();
 
         let data = UploadsPageData {
             uploads: uploads,
