@@ -432,27 +432,14 @@ impl FlupHandler {
     pub fn handle_file(&self, req: &mut Request) -> IronResult<Response> {
         let router = req.extensions.get::<Router>().unwrap();
         let file_id = router.find("id").unwrap().to_string();
+        let file_name = router.find("name").unwrap().to_string();
 
-        match self.flup.file(&file_id) {
-            Ok(file_info) => {
-                let file_path = PathBuf::from(format!("files/{}", &file_id));
+        let file_path = PathBuf::from(format!("files/{}", &file_id));
 
-                let name_path = PathBuf::from(file_info.name);
-                let mime = mime_guess::guess_mime_type(name_path);
+        let name_path = PathBuf::from(file_name);
+        let mime = mime_guess::guess_mime_type(name_path);
 
-                Ok(Response::with((Status::Ok, mime, file_path)))
-            },
-            Err(error) => {
-                let (error_type, error_text) = error_info_from_get_error(&error);
-
-                let status = match error_type {
-                    GetErrorType::NotFound => Status::NotFound,
-                    GetErrorType::Denied => Status::Forbidden,
-                };
-
-                self.error_page(status, error_text)
-            },
-        }
+        Ok(Response::with((Status::Ok, mime, file_path)))
     }
 
     pub fn handle_home(&self, _: &mut Request) -> IronResult<Response> {
