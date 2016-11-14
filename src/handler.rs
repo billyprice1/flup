@@ -5,9 +5,6 @@ use super::{
     UploadRequest,
     UploadRequestParams,
     UploadError,
-    IdGetRequest,
-    IdGetError,
-    GetRequest,
     GetError,
 };
 
@@ -25,9 +22,9 @@ use rustc_serialize::json;
 use self::params::{Params, Value};
 
 use self::iron::prelude::*;
-use self::iron::Url;
 use self::iron::status::Status;
-use self::iron::modifiers::Redirect;
+use self::iron::modifiers::Header;
+use self::iron::headers;
 
 use self::staticfile::Static;
 use self::router::Router;
@@ -43,12 +40,7 @@ enum UploadErrorType {
     Denied,
 }
 
-enum IdGetErrorType {
-    NotFound,
-}
-
 enum GetErrorType {
-    ServerError,
     Denied,
     NotFound,
 }
@@ -100,9 +92,19 @@ struct ErrorPageData {
     error: String,
 }
 
+#[derive(Debug, Clone, RustcDecodable)]
+pub struct FlupHandlerConfig {
+    url: String,
+    host: String,
+
+    xforwarded: bool,
+    xforwarded_index: usize,
+}
+
 #[derive(Clone)]
 pub struct FlupHandler {
     flup: Flup,
+    config: FlupHandlerConfig,
 }
 
 fn error_info_from_upload_error(error: &UploadError) -> (UploadErrorType, &str) {
@@ -127,22 +129,23 @@ fn error_info_from_get_error(error: &GetError) -> (GetErrorType, &str) {
     match error {
         &GetError::NotFound => (GetErrorType::NotFound, "File not found"),
         &GetError::BlockedExtension => (GetErrorType::Denied, "Fetching this extension is not allowed, try changing the filename in the url :^)"),
-        &GetError::FileNotFound => (GetErrorType::ServerError, "File not found (on disk (oh fuck))"),
     }
 }
 
-fn error_info_from_id_get_error(error: &IdGetError) -> (IdGetErrorType, &str) {
-    match error {
-        &IdGetError::NotFound => (IdGetErrorType::NotFound, "File not found"),
-    }
+fn handle_xforwarded(ips_string: &str, i: usize) -> Option<String> {
+    let mut ips: Vec<&str> = ips_string.split(", ").collect();
+    ips.reverse();
+
+    ips.get(i).map(|ip| ip.to_string())
 }
 
 impl FlupHandler {
-    pub fn start(flup: Flup) {
+    pub fn start(flup: Flup, config: FlupHandlerConfig) {
         let mut router = Router::new();
 
         let flup_handler = FlupHandler {
-            flup: flup.clone(),
+            config: config.clone(),
+            flup: flup,
         };
 
         let flup_handler_clone = flup_handler.clone();
@@ -194,10 +197,9 @@ impl FlupHandler {
         mount.mount("/static/", Static::new(Path::new("static")));
 
         let mut chain = Chain::new(mount);
-
         chain.link_after(hbse);
 
-        Iron::new(chain).http(flup.config.host.as_str()).expect("Unable to start webserver");
+        Iron::new(chain).http(config.host.as_str()).expect("Unable to start webserver");
     }
 
     fn error_page(&self, status: Status, text: &str) -> IronResult<Response> {
@@ -232,19 +234,17 @@ impl FlupHandler {
 
         let params = match req.get_ref::<Params>() {
             Ok(params) => {
-                let mut files = vec![];
-
-                match params.get("files") {
+               let files = match params.get("files") {
                     Some(&Value::Array(ref file_values)) => {
-                        for value in file_values {
-                            if let &Value::File(ref file) = value {
-                                let filename = file.filename.clone();
-                                files.push((file.open().ok(), filename))
+                        file_values.into_iter().filter_map(|value| {
+                            match value {
+                                &Value::File(ref file) => Some((file.open(), file.filename.clone())),
+                                _ => None,
                             }
-                        }
+                        }).collect()
                     },
-                    _ => {  },
-                }
+                    _ => vec![],
+                };
 
                 let desc = match params.get("desc") {
                     Some(&Value::String(ref desc)) => Some(desc.clone()),
@@ -272,22 +272,27 @@ impl FlupHandler {
             _ => None,
         };
 
+        let ip = match xforwarded {
+            Some(ref ips_string) if self.config.xforwarded == true => {
+                handle_xforwarded(ips_string, self.config.xforwarded_index)
+                    .expect("Invalid xforwarded index, change your config?")
+            },
+            _ => req.remote_addr.to_string(),
+        };
+
         UploadRequest {
-            xforwarded: xforwarded,
-
+            ip: ip,
             params: params,
-
-            ip: req.remote_addr.to_string(),
         }
     }
 
     pub fn handle_upload_html(&self, req: &mut Request) -> IronResult<Response> {
         let flup_req = self.process_upload_request(req);
 
-        match self.flup.upload(flup_req) {
+        match self.flup.upload(&flup_req) {
             Ok(files) => {
                 let uploaded = files.into_iter().map(|file_info| {
-                    format!("{}/{}", self.flup.config.url, file_info.file_id)
+                    format!("{}/{}", self.config.url, file_info.file_id)
                 }).collect();
 
                 let data = UploadedPageData {
@@ -315,10 +320,10 @@ impl FlupHandler {
     pub fn handle_upload_text(&self, trailing: bool, req: &mut Request) -> IronResult<Response> {
         let flup_req = self.process_upload_request(req);
 
-        match self.flup.upload(flup_req) {
+        match self.flup.upload(&flup_req) {
             Ok(files) => {
                 let urls = files.into_iter().map(|file_info| {
-                    format!("{}/{}", self.flup.config.url, file_info.file_id)
+                    format!("{}/{}", self.config.url, file_info.file_id)
                 }).collect::<Vec<String>>();
 
                 let urls_string = match trailing {
@@ -345,14 +350,14 @@ impl FlupHandler {
     pub fn handle_upload_json(&self, req: &mut Request) -> IronResult<Response> {
         let flup_req = self.process_upload_request(req);
 
-        match self.flup.upload(flup_req) {
+        match self.flup.upload(&flup_req) {
             Ok(files) => {
                 let mut json_files = vec![];
 
                 for file_info in files {
                     json_files.push(JsonFile {
                         name: file_info.name,
-                        url: format!("{}/{}", self.flup.config.url, file_info.file_id),
+                        url: format!("{}/{}", self.config.url, file_info.file_id),
                         hash: file_info.hash,
                         size: file_info.size,
                     })
@@ -400,30 +405,23 @@ impl FlupHandler {
         }
     }
 
-    fn process_file_by_id_request(&self, req: &mut Request) -> IdGetRequest {
+    pub fn handle_file_by_id(&self, req: &mut Request) -> IronResult<Response> {
         let router = req.extensions.get::<Router>().unwrap();
         let file_id = router.find("id").unwrap().to_string();
 
-        IdGetRequest {
-            file_id: file_id,
-        }
-    }
-
-    pub fn handle_file_by_id(&self, req: &mut Request) -> IronResult<Response> {
-        let flup_req = self.process_file_by_id_request(req);
-
-        match self.flup.file_by_id(flup_req) {
-            Ok((file_id, file_info)) => {
-                let url = format!("{}/{}/{}", self.flup.config.url, file_id, file_info.name);
-                let redirect = Redirect(Url::parse(&url).unwrap());
+        match self.flup.file(&file_id) {
+            Ok(file_info) => {
+                let url = format!("/{}/{}", file_id, file_info.name);
+                let redirect = Header(headers::Location(url));
 
                 Ok(Response::with((Status::SeeOther, redirect)))
             },
             Err(error) => {
-                let (error_type, error_text) = error_info_from_id_get_error(&error);
+                let (error_type, error_text) = error_info_from_get_error(&error);
 
                 let status = match error_type {
-                    IdGetErrorType::NotFound => Status::NotFound,
+                    GetErrorType::NotFound => Status::NotFound,
+                    GetErrorType::Denied => Status::Forbidden,
                 };
 
                 self.error_page(status, error_text)
@@ -431,24 +429,13 @@ impl FlupHandler {
         }
     }
 
-    fn process_file_request(&self, req: &mut Request) -> GetRequest {
+    pub fn handle_file(&self, req: &mut Request) -> IronResult<Response> {
         let router = req.extensions.get::<Router>().unwrap();
         let file_id = router.find("id").unwrap().to_string();
-        let filename = router.find("name").unwrap().to_string();
 
-        GetRequest {
-            file_id: file_id,
-            filename: filename,
-        }
-    }
-
-    pub fn handle_file(&self, req: &mut Request) -> IronResult<Response> {
-        let flup_req = self.process_file_request(req);
-
-        match self.flup.file(flup_req) {
+        match self.flup.file(&file_id) {
             Ok(file_info) => {
-                let flup_req = self.process_file_request(req);
-                let file_path = PathBuf::from(format!("files/{}", &flup_req.file_id));
+                let file_path = PathBuf::from(format!("files/{}", &file_id));
 
                 let name_path = PathBuf::from(file_info.name);
                 let mime = mime_guess::guess_mime_type(name_path);
@@ -459,7 +446,6 @@ impl FlupHandler {
                 let (error_type, error_text) = error_info_from_get_error(&error);
 
                 let status = match error_type {
-                    GetErrorType::ServerError => Status::InternalServerError,
                     GetErrorType::NotFound => Status::NotFound,
                     GetErrorType::Denied => Status::Forbidden,
                 };
@@ -470,7 +456,7 @@ impl FlupHandler {
     }
 
     pub fn handle_home(&self, _: &mut Request) -> IronResult<Response> {
-        let (uploads_count, public_uploads_count) = self.flup.uploads_count().unwrap_or((0, 0));
+        let (uploads_count, public_uploads_count) = self.flup.uploads_count();
 
         let data = HomePageData {
             uploads_count: uploads_count,
@@ -483,7 +469,7 @@ impl FlupHandler {
     }
 
     pub fn handle_public_uploads_get(&self, _: &mut Request) -> IronResult<Response> {
-        let uploads = self.flup.public_uploads().unwrap_or(vec![]);
+        let uploads = self.flup.public_uploads();
 
         let data = UploadsPageData {
             uploads: uploads,
@@ -501,7 +487,7 @@ impl FlupHandler {
     }
 
     pub fn handle_deletion_log(&self, _: &mut Request) -> IronResult<Response> {
-        let deleted_files = self.flup.deletion_log().unwrap_or(vec![]);
+        let deleted_files = self.flup.deletion_log();
 
         let data = DeletedFilesData {
             deleted_files: deleted_files,

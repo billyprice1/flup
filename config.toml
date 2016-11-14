@@ -1,12 +1,16 @@
-host = "localhost:8080"
-url = "http://localhost:8080"
-
+[flup]
 salt = "wewsalt"
-
-redis_prefix = "lainfile"
 
 no_access_extensions = ["exe", "rar"]
 no_upload_extensions = ["exe"]
 
+max_size = 8388608
+
+[flup_handler]
 xforwarded = true
 xforwarded_index = 1
+
+host = "localhost:8080"
+
+[flup_db]
+prefix = "lainfile"

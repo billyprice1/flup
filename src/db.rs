@@ -17,10 +17,15 @@ pub enum StartError {
     Pool(r2d2::InitializationError),
 }
 
+#[derive(Debug, Clone, RustcDecodable)]
+pub struct FlupDbConfig {
+    prefix: String,
+}
+
 #[derive(Clone)]
 pub struct FlupDb {
     redis: r2d2::Pool<RedisConnectionManager>,
-    key_prefix: String,
+    config: FlupDbConfig,
 }
 
 impl ToRedisArgs for FileInfo {
@@ -48,85 +53,90 @@ impl FromRedisValue for DeletedFile {
 }
 
 impl FlupDb {
-    pub fn new(key_prefix: String) -> Result<FlupDb, StartError> {
+    pub fn new(config: FlupDbConfig) -> Result<FlupDb, StartError> {
         let manager = match RedisConnectionManager::new("redis://127.0.0.1/") {
             Err(error) => return Err(StartError::RedisError(error)),
             Ok(manager) => manager,
         };
 
-        let config = Default::default();
+        let r2d2_config = Default::default();
 
-        let pool = match r2d2::Pool::new(config, manager) {
+        let pool = match r2d2::Pool::new(r2d2_config, manager) {
             Err(error) => return Err(StartError::Pool(error)),
             Ok(pool) => pool,
         };
 
         Ok(FlupDb {
             redis: pool,
-            key_prefix: key_prefix,
+            config: config,
         })
     }
 
     fn get_redis(&self) -> r2d2::PooledConnection<RedisConnectionManager> {
-        self.redis.get().expect("Unable to get redis conn from pool")
+        self.redis.get()
+            .expect("DB Error: Unable to get Redis conn from pool")
     }
 
-    pub fn new_id_seed(&self) -> redis::RedisResult<usize> {
+    pub fn new_id_seed(&self) -> isize {
         let redis = self.get_redis();
 
-        Ok(try!(redis.incr(self.key_prefix.clone() + "::idseed", 1)))
+        redis.incr(format!("{}::idseed", &self.config.prefix), 1)
+            .expect("DB Error: Unable to get ID seed")
     }
 
-    pub fn add_file(&self, file_id: String, file: FileInfo, public: bool) -> redis::RedisResult<()> {
+    pub fn add_file(&self, file_id: &String, file: &FileInfo, public: bool) {
         let redis = self.get_redis();
 
-        try!(redis.hset(self.key_prefix.clone() + "::hashes", file.hash.clone(), file_id.clone()));
-        try!(redis.hset(self.key_prefix.clone() + "::files", file_id.clone(), file));
+        let () = redis.hset(format!("{}::hashes", &self.config.prefix), file.hash.clone(), file_id.clone())
+            .expect(&format!("DB Error: Error adding file hash to file hashes map (ID: {})", file_id));
+        let () = redis.hset(format!("{}::files", &self.config.prefix), file_id.clone(), file.clone())
+            .expect(&format!("Error adding file info to files DB (ID: {})", file_id));
 
         if public == true {
-            try!(redis.lpush(self.key_prefix.clone() + "::publicfiles", file_id));
+            redis.lpush(format!("{}::publicfiles", &self.config.prefix), file_id)
+                .expect(&format!("DB Error: Error adding file ID to public files list (ID: {})", file_id))
         }
-
-        Ok(())
     }
 
-    pub fn get_file_id_by_hash(&self, hash: String) -> redis::RedisResult<String> {
+    pub fn get_file_id_by_hash(&self, hash: &str) -> Option<String> {
         let redis = self.get_redis();
 
-        Ok(try!(redis.hget(self.key_prefix.clone() + "::hashes", hash)))
+        redis.hget(format!("{}::hashes", &self.config.prefix), hash)
+            .expect(&format!("DB Error: Error getting file ID from file hashes map (hash: {})", hash))
     }
 
-    pub fn get_file_by_id(&self, file_id: String) -> redis::RedisResult<FileInfo> {
+    pub fn get_file_by_id(&self, file_id: &str) -> Option<FileInfo> {
         let redis = self.get_redis();
 
-        Ok(try!(redis.hget(self.key_prefix.clone() + "::files", file_id)))
+        redis.hget(format!("{}::files", &self.config.prefix), file_id)
+            .expect(&format!("DB Error: Error getting file info from file map (ID: {})", file_id))
     }
 
-    pub fn get_public_uploads(&self) -> redis::RedisResult<Vec<FileInfo>> {
+    pub fn get_public_uploads(&self) -> Vec<String> {
         let redis = self.get_redis();
 
-        let public_ids: Vec<String> = try!(redis.lrange(self.key_prefix.clone() + "::publicfiles", 0, -1));
-
-        Ok(public_ids.into_iter().map(|key: String| {
-            self.get_file_by_id(key).expect("File in publicfiles missing") // TODO: handle this error
-        }).collect())
+        redis.lrange(format!("{}::publicfiles", &self.config.prefix), 0, -1)
+            .expect("DB Error: Error getting public uploads list")
     }
 
-    pub fn get_uploads_count(&self) -> redis::RedisResult<isize> {
+    pub fn get_uploads_count(&self) -> isize {
         let redis = self.get_redis();
 
-        Ok(try!(redis.hlen(self.key_prefix.clone() + "::files")))
+        redis.hlen(format!("{}::files", &self.config.prefix))
+            .expect("DB Error: Error getting public upload count")
     }
 
-    pub fn get_public_uploads_count(&self) -> redis::RedisResult<isize> {
+    pub fn get_public_uploads_count(&self) -> isize {
         let redis = self.get_redis();
 
-        Ok(try!(redis.llen(self.key_prefix.clone() + "::publicfiles")))
+        redis.llen(format!("{}::publicfiles", &self.config.prefix))
+            .expect("DB Error: Error getting public upload count")
     }
 
-    pub fn get_deleted_files(&self) -> redis::RedisResult<Vec<DeletedFile>> {
+    pub fn get_deleted_files(&self) -> Vec<DeletedFile> {
         let redis = self.get_redis();
 
-        Ok(try!(redis.lrange(self.key_prefix.clone() + "::deletionlog", 0, -1)))
+        redis.lrange(format!("{}::deletionlog", &self.config.prefix), 0, -1)
+            .expect("DB Error: Error getting deleted files list")
     }
 }
