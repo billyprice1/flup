@@ -11,6 +11,7 @@ xforwarded = true
 xforwarded_index = 1
 
 host = "localhost:8080"
+url = "http://localhost:8080"
 
 [flup_db]
 prefix = "lainfile"
