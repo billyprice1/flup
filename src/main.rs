@@ -22,7 +22,7 @@ mod handler;
 use db::{FlupDb, FlupDbConfig};
 use handler::{FlupHandler, FlupHandlerConfig};
 
-static ID_CHARS: &'static [char] = &['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+static ID_CHARS: &'static [char] = &['2','3','4','5','6','7','8','9','A','B','C','D','E','F','G','H','J','K','L','M','N','P','Q','R','S','T','U','V','W','X','Y','Z','a','b','c','d','e','f','g','h','i','j','k','m','n','p','q','r','s','t','u','v','w','x','y','z'];
 
 #[derive(Debug, Clone, RustcDecodable)]
 pub struct FlupConfig {
@@ -260,7 +260,7 @@ impl Flup {
 
             let filename = match filename.as_ref().map(|filename| filename.trim())  {
                 Some(ref filename) if filename.len() > 0 => {
-                    handle_filename(filename.to_string(), !params.no_filename)
+                    handle_filename(filename.to_string(), params.no_filename)
                 },
                 _ => "file".to_string(),
             };
