@@ -158,7 +158,7 @@ fn handle_filename(filename: String, remove_filename: bool) -> String {
 }
 
 fn blocked_extension(blocked: &[String], filename: &String) -> bool {
-    if let Some(extension) = Path::new(filename.as_str()).extension() {
+    if let Some(extension) = Path::new(&filename.to_lowercase()).extension() {
         let extension_string = extension.to_str().unwrap().to_string();
 
         blocked.contains(&extension_string)
