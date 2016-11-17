@@ -31,26 +31,26 @@
 </head>
 
 <body>
-    <h1 id="header">ｗｉｒｅｄ</h1>
+    <h1 id="header">ＮＯ</h1>
 
     <form action="/" method="post" enctype="multipart/form-data">
         <input type=hidden name="output" value="html">
 
         <div class="box">
-            <label class="no-highlight" for="desc-input">Description (optional):</label>
+            <label class="no-highlight" for="desc-input">Description:</label>
             <br>
-            <input type="text" name="desc" id="desc-input">
+            <input type="text" name="desc" id="desc-input" value="boring file">
 
             <br>
             <br>
 
-            <label class="no-highlight" for="private-toggle">Long URL and hide from list:</label>
+            <label class="no-highlight" for="private-toggle">Private file:</label>
             <input type="checkbox" name="private" id="private-toggle">
             <label for="private-toggle" class="no-highlight checkbox-wrapper"></label>
 
             <br>
 
-            <label class="no-highlight" for="nofilename-toggle">Hide upload's original filename:</label>
+            <label class="no-highlight" for="nofilename-toggle">Strip filename:</label>
             <input type="checkbox" name="nofilename" id="nofilename-toggle">
             <label for="nofilename-toggle" class="no-highlight checkbox-wrapper"></label>
         </div>
@@ -62,11 +62,16 @@
         <input type="submit" value="Upload!" id="upload">
     </form>
 
-    <h5><a href="/about">about page</a></h5>
+    <br>
 
-    <img src="/static/anime.png" id="anime">
+    <h4><a href="/about">about page</a></h4>
+    <h5>( <a href="/about#info">Info</a> | <a href="/about#rules">Rules</a> | <a href="/about#removal">Removal</a> | <a href="/about#tools">Tools</a> | <a href="/about#notes">Notes</a> )</h5>
+
+    <br>
 
     <footer>{{ uploads_count }} total uploads - {{ public_uploads_count }} <a href="uploads">public uploads</a>!</footer>
+
+    <img src="/static/anime.png" id="anime">
 
     <script src="/static/script.js"></script>
 </body>

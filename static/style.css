@@ -17,6 +17,10 @@ body {
     background: #195;
 }
 
+ul {
+    text-align: left;
+}
+
 footer {
     height: 20px;
 }
