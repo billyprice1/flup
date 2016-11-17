@@ -83,7 +83,7 @@ impl FlupDb {
         redis.incr(format!("{}::idseed", &self.config.prefix), 1)
             .expect("DB Error: Unable to get ID seed")
     }
-
+    
     pub fn add_file(&self, file_id: &String, file: &FileInfo, public: bool) {
         let redis = self.get_redis();
 

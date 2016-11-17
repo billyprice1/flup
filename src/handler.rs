@@ -5,6 +5,7 @@ use super::{
     UploadRequest,
     UploadRequestParams,
     UploadError,
+    IdGetError,
     GetError,
 };
 
@@ -42,6 +43,10 @@ enum UploadErrorType {
 
 enum GetErrorType {
     Denied,
+    NotFound,
+}
+
+enum IdGetErrorType {
     NotFound,
 }
 
@@ -129,6 +134,12 @@ fn error_info_from_get_error(error: &GetError) -> (GetErrorType, &str) {
     match error {
         &GetError::NotFound => (GetErrorType::NotFound, "File not found"),
         &GetError::BlockedExtension => (GetErrorType::Denied, "Fetching this extension is not allowed, try changing the filename in the url :^)"),
+    }
+}
+
+fn error_info_from_id_get_error(error: &IdGetError) -> (IdGetErrorType, &str) {
+    match error {
+        &IdGetError::NotFound => (IdGetErrorType::NotFound, "File not found"),
     }
 }
 
@@ -409,7 +420,7 @@ impl FlupHandler {
         let router = req.extensions.get::<Router>().unwrap();
         let file_id = router.find("id").unwrap().to_string();
 
-        match self.flup.file(&file_id) {
+        match self.flup.file_by_id(&file_id) {
             Ok(file_info) => {
                 let url = format!("/{}/{}", file_id, file_info.name);
                 let redirect = Header(headers::Location(url));
@@ -417,11 +428,10 @@ impl FlupHandler {
                 Ok(Response::with((Status::SeeOther, redirect)))
             },
             Err(error) => {
-                let (error_type, error_text) = error_info_from_get_error(&error);
+                let (error_type, error_text) = error_info_from_id_get_error(&error);
 
                 let status = match error_type {
-                    GetErrorType::NotFound => Status::NotFound,
-                    GetErrorType::Denied => Status::Forbidden,
+                    IdGetErrorType::NotFound => Status::NotFound,
                 };
 
                 self.error_page(status, error_text)
@@ -434,7 +444,7 @@ impl FlupHandler {
         let file_id = router.find("id").unwrap().to_string();
         let file_name = router.find("name").unwrap().to_string();
 
-        match self.flup.file(&file_id) {
+        match self.flup.file(&file_id, &file_name) {
             Ok(_) => {
                 let file_path = PathBuf::from(format!("files/{}", &file_id));
 

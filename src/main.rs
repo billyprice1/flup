@@ -285,8 +285,15 @@ impl Flup {
         Ok(files)
     }
 
-    pub fn file(&self, file_id: &String) -> Result<FileInfo, GetError> {
-        if blocked_extension(&self.config.no_access_extensions, &file_id) {
+    pub fn file_by_id(&self, file_id: &String) -> Result<FileInfo, IdGetError> {
+        match self.db.get_file_by_id(&file_id) {
+            Some(file_info) => Ok(file_info),
+            None => return Err(IdGetError::NotFound),
+        }
+    }
+
+    pub fn file(&self, file_id: &String, filename: &String) -> Result<FileInfo, GetError> {
+        if blocked_extension(&self.config.no_access_extensions, &filename) {
             return Err(GetError::BlockedExtension);
         }
 
