@@ -6,6 +6,9 @@ extern crate rustc_serialize;
 #[macro_use] extern crate tojson_macros;
 extern crate toml;
 extern crate crypto;
+extern crate rand;
+
+use rand::Rng;
 
 use rustc_serialize::Decodable;
 
@@ -40,6 +43,8 @@ pub struct FileInfo {
     pub desc: String,
 
     pub file_id: String,
+
+    pub file_path: String,
 
     pub hash: String,
     pub size: u64,
@@ -181,7 +186,7 @@ impl Flup {
     }
 
     fn new_file_id(&self) -> String {
-        let mut i = self.db.new_id_seed() as usize + 1;
+        let mut i = self.db.new_id_seed() + 1;
         let mut id = String::new();
 
         while i > 0 {
@@ -194,6 +199,15 @@ impl Flup {
 
         match self.db.get_file_by_id(&id) {
             Some(_) => self.new_file_id(),
+            None => id,
+        }
+    }
+
+    fn new_secure_file_id(&self) -> String {
+        let id: String = rand::thread_rng().gen_ascii_chars().take(10).collect();
+
+        match self.db.get_file_by_id(&id) {
+            Some(_) => self.new_secure_file_id(),
             None => id,
         }
     }
@@ -216,6 +230,15 @@ impl Flup {
         let mut files = vec![];
 
         for &(ref attempted_file_open, ref filename) in &params.files {
+            let filename = match filename.as_ref().map(|filename| filename.trim())  {
+                Some(ref filename) if filename.len() > 0 => handle_filename(filename.to_string(), params.no_filename),
+                _ => "file".to_string(),
+            };
+
+            if blocked_extension(&self.config.no_upload_extensions, &filename) {
+                return Err(UploadError::BlockedExtension);
+            }
+
             let mut file = match attempted_file_open {
                 &Ok(ref file) => file,
                 _ => return Err(UploadError::OpenUploadFile),
@@ -239,46 +262,42 @@ impl Flup {
 
             let hash = hash_file_data(&file_data);
 
-            if let Some(file_id) = self.db.get_file_id_by_hash(&hash) {
-                files.push(self.db.get_file_by_id(&file_id).expect("File with identical hash missing"));
-                continue;
-            }
-
             let file_id = match params.is_private {
-                true => hash.chars().take(10).collect(),
+                true => self.new_secure_file_id(),
                 false => self.new_file_id(),
             };
 
-            match File::create(format!("files/{}", file_id)) {
-                Ok(mut file) => {
-                    if file.write_all(&file_data).is_err() {
-                        return Err(UploadError::WriteFile)
+            let file_path = match self.db.get_file_id_by_hash(&hash) {
+                Some(file_id) => self.db.get_file_by_id(&file_id).expect("File with identical hash missing").file_path,
+                None => {
+                    match File::create(format!("files/{}", &file_id)) {
+                        Ok(mut file) => {
+                            if let Err(_) = file.write_all(&file_data) {
+                                return Err(UploadError::WriteFile)
+                            }
+                        },
+                        Err(_) => return Err(UploadError::CreateFile),
                     }
-                },
-                Err(_) => return Err(UploadError::CreateFile),
-            }
 
-            let filename = match filename.as_ref().map(|filename| filename.trim())  {
-                Some(ref filename) if filename.len() > 0 => {
-                    handle_filename(filename.to_string(), params.no_filename)
-                },
-                _ => "file".to_string(),
+                    file_id.clone()
+                }, 
             };
-
-            if blocked_extension(&self.config.no_upload_extensions, &filename) {
-                return Err(UploadError::BlockedExtension);
-            }
 
             let file_info = FileInfo {
                 name: filename,
                 desc: desc.to_string(),
+
+                file_path: file_path,
+
                 file_id: file_id.clone(),
+
                 hash: hash,
                 size: file_size,
+
                 uploader: uploader.clone(),
             };
 
-            self.db.add_file(&file_info.file_id, &file_info, !params.is_private);
+            self.db.add_file(&file_id, &file_info, !params.is_private);
             files.push(file_info);
         }
 
@@ -303,7 +322,7 @@ impl Flup {
         }
     }
 
-    pub fn uploads_count(&self) -> (isize, isize) {
+    pub fn uploads_count(&self) -> (usize, usize) {
         let uploads_count = self.db.get_uploads_count();
         let public_uploads_count = self.db.get_public_uploads_count();
 

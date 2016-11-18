@@ -77,7 +77,7 @@ impl FlupDb {
             .expect("DB Error: Unable to get Redis conn from pool")
     }
 
-    pub fn new_id_seed(&self) -> isize {
+    pub fn new_id_seed(&self) -> usize {
         let redis = self.get_redis();
 
         redis.incr(format!("{}::idseed", &self.config.prefix), 1)
@@ -119,14 +119,14 @@ impl FlupDb {
             .expect("DB Error: Error getting public uploads list")
     }
 
-    pub fn get_uploads_count(&self) -> isize {
+    pub fn get_uploads_count(&self) -> usize {
         let redis = self.get_redis();
 
         redis.hlen(format!("{}::files", &self.config.prefix))
             .expect("DB Error: Error getting public upload count")
     }
 
-    pub fn get_public_uploads_count(&self) -> isize {
+    pub fn get_public_uploads_count(&self) -> usize {
         let redis = self.get_redis();
 
         redis.llen(format!("{}::publicfiles", &self.config.prefix))

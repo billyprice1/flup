@@ -73,8 +73,8 @@ struct ErrorJsonResponse<'a> {
 
 #[derive(ToJson)]
 struct HomePageData {
-    uploads_count: isize,
-    public_uploads_count: isize,
+    uploads_count: usize,
+    public_uploads_count: usize,
 }
 
 #[derive(ToJson)]
@@ -445,8 +445,8 @@ impl FlupHandler {
         let file_name = router.find("name").unwrap().to_string();
 
         match self.flup.file(&file_id, &file_name) {
-            Ok(_) => {
-                let file_path = PathBuf::from(format!("files/{}", &file_id));
+            Ok(file_info) => {
+                let file_path = PathBuf::from(format!("files/{}", &file_info.file_path));
 
                 let name_path = PathBuf::from(file_name);
                 let mime = mime_guess::guess_mime_type(name_path);
