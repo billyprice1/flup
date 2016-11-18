@@ -7,6 +7,7 @@ extern crate rustc_serialize;
 extern crate toml;
 extern crate crypto;
 extern crate rand;
+extern crate time;
 
 use rand::Rng;
 
@@ -48,6 +49,7 @@ pub struct FileInfo {
 
     pub hash: String,
     pub size: u64,
+    pub time: String,
 
     pub uploader: String,
 }
@@ -293,6 +295,7 @@ impl Flup {
 
                 hash: hash,
                 size: file_size,
+                time: time::now().strftime("%FT%T").unwrap().to_string(),
 
                 uploader: uploader.clone(),
             };
