@@ -80,11 +80,13 @@ struct HomePageData {
 #[derive(ToJson)]
 struct UploadedPageData {
     uploaded: Vec<String>,
+    base_url: String,
 }
 
 #[derive(ToJson)]
 struct UploadsPageData {
     uploads: Vec<FileInfo>,
+    base_url: String,
 }
 
 #[derive(ToJson)]
@@ -303,11 +305,12 @@ impl FlupHandler {
         match self.flup.upload(&flup_req) {
             Ok(files) => {
                 let uploaded = files.into_iter().map(|file_info| {
-                    format!("{}/{}", self.config.url, file_info.file_id)
+                   file_info.file_id
                 }).collect();
 
                 let data = UploadedPageData {
                     uploaded: uploaded,
+                    base_url: self.config.url.clone(),
                 };
 
                 let mut resp = Response::new();
@@ -484,6 +487,7 @@ impl FlupHandler {
 
         let data = UploadsPageData {
             uploads: uploads,
+            base_url: self.config.url.clone(),
         };
 
         let mut resp = Response::new();
